@@ -12,6 +12,10 @@ __pycache__/
 .streamlit/secrets.toml
 kaggle.json
 *credentials*.json
+duplicate_review*.csv
+duplicate_decisions*.csv
+reviewed_duplicates*.csv
+contact_sheets/
 # Never upload patient metadata, images, trained weights, or generated outputs.
 data/*
 !data/README.md

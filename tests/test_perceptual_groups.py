@@ -1,5 +1,6 @@
-"""Conservative perceptual grouping supplements exact decoded-pixel hashes."""
+"""Perceptual matches require explicit human decisions before grouping."""
 
+import pandas as pd
 import pytest
 
 from covid_xray.data import build_manifest, perceptual_hash, validate_manifest
@@ -13,22 +14,36 @@ def test_perceptual_hash_is_reproducible_64_bit(image_index):
     assert perceptual_hash(path) == value
 
 
-def test_perceptual_matches_group_different_pixel_hashes(image_index):
+def test_human_accepted_perceptual_matches_group_different_pixels(image_index):
     frame = image_index.copy()
     frame['perceptual_hash'] = frame.path.map(perceptual_hash)
-    # Simulate a manually confirmed signature match with distinct real pixels.
-    # The splitter conservatively joins them even with different patient IDs.
     frame.loc[1, 'perceptual_hash'] = frame.loc[0, 'perceptual_hash']
-    result = build_manifest(frame)
+    group_id = f"perceptual:{frame.loc[0, 'perceptual_hash']}"
+    decisions = pd.DataFrame(
+        [{"group_id": group_id, "review_status": "accepted"}]
+    )
+
+    result = build_manifest(frame, review=decisions)
+
     patients = set(frame.iloc[:2].patient_id)
     assert result[result.patient_id.isin(patients)].split.nunique() == 1
 
 
-def test_cross_split_perceptual_matches_are_rejected(manifest):
+def test_perceptual_hash_match_alone_is_not_treated_as_confirmed(manifest):
     first = manifest[manifest.split.eq('train')].index[0]
     second = manifest[manifest.split.eq('test')].index[0]
     manifest.loc[second, 'perceptual_hash'] = manifest.loc[first, 'perceptual_hash']
-    with pytest.raises(ValueError, match='perceptual_hash'):
+
+    validate_manifest(manifest)
+
+
+def test_accepted_perceptual_group_cannot_cross_manifest_splits(manifest):
+    first = manifest[manifest.split.eq('train')].index[0]
+    second = manifest[manifest.split.eq('test')].index[0]
+    group_id = "perceptual:accepted-review-group"
+    manifest.loc[[first, second], 'accepted_duplicate_group'] = group_id
+
+    with pytest.raises(ValueError, match='accepted_duplicate_group'):
         validate_manifest(manifest)
 
 

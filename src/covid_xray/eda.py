@@ -41,29 +41,31 @@ def create_dataset_report(frame, quality_report, output):
         json.dumps(quality_report, indent=2, allow_nan=False)
     )
 
-    class_summary = (
-        audited.groupby("label")
-        .agg(
-            metadata_records=("image_path", "size"),
-            valid_image_records=("readable", "sum"),
-        )
-        .reindex(CLASSES, fill_value=0)
-        .reset_index()
+    # Distribution plots contain only images decoded successfully in this run.
+    valid = audited[audited.readable].copy()
+    partitions = ["train", "test"]
+    combinations = pd.MultiIndex.from_product(
+        [CLASSES, partitions], names=["label", "original_partition"]
     )
-    plot_data = class_summary.melt(
-        id_vars="label", var_name="observation", value_name="count"
+    plot_data = (
+        valid.groupby(["label", "original_partition"])
+        .size()
+        .reindex(combinations, fill_value=0)
+        .rename("count")
+        .reset_index()
     )
     fig, axis = plt.subplots(figsize=(8, 5))
     sns.barplot(
         data=plot_data,
         x="label",
         y="count",
-        hue="observation",
+        hue="original_partition",
         order=CLASSES,
+        hue_order=partitions,
         ax=axis,
     )
     axis.set(
-        title="Upstream metadata records vs locally validated images",
+        title="Locally validated readable images by class",
         xlabel="Class",
         ylabel="Count",
     )
@@ -71,7 +73,6 @@ def create_dataset_report(frame, quality_report, output):
     fig.savefig(output / "class_distribution.png", dpi=160)
     plt.close(fig)
 
-    valid = audited[audited.readable].copy()
     if not valid.empty:
         # Display only locally decoded images; no placeholder pixels are generated.
         fig, axes = plt.subplots(len(CLASSES), 3, figsize=(9, 9), squeeze=False)

@@ -30,6 +30,12 @@ performed against Phase 1 on `main` before creating `phase2/dataset-eda`.
   not create final splits or train a model.
 - Synthetic pytest fixtures cover parser compatibility, labels, valid images,
   missing files, corrupt files, unsupported formats, duplicates, and reports.
+- `covid_xray.review` now produces an ignored, patient-level duplicate review CSV
+  and optional contact sheets. It distinguishes confirmed exact matches from
+  perceptual candidates and validates explicit human decisions.
+- Manifest creation now links patients, exact duplicates, and only human-accepted
+  perceptual groups. It stops for exact, accepted, or unresolved candidate links
+  across the official train/test boundary.
 
 ## Environment finding
 
@@ -40,4 +46,9 @@ The repository owner subsequently ran the supplied workflow in an authorized
 Google Colab session against the complete archive. Its aggregate findings are
 recorded in `docs/PHASE2_RESULTS.md`. Medical images, patient-level CSV files,
 and the sample-image montage remain outside Git.
+
+The prior aggregate report did not include group-level partition membership.
+Consequently, the 8 exact groups and 242 perceptual candidates still require the
+private workflow and human review described in `docs/PHASE2_FINAL_CHECKLIST.md`.
+No such human decision is marked complete in the repository.
 

@@ -64,6 +64,23 @@ redistribute images or the upstream label files.
 | Actualmed `actmed` collection | The original [README](https://raw.githubusercontent.com/agchung/Actualmed-COVID-chestxray-dataset/master/README.md), HTTPS 200, states research purposes only; an explicit standalone image license was not established in this session. Obtain applicable permission or exclude. |
 | `rsna`, `ricord`, `stonybrook`, and `sirm` collections | These source tokens appear in the inspected labels. The author instructions link the [RSNA challenge](https://www.kaggle.com/c/rsna-pneumonia-detection-challenge), [RICORD source](https://wiki.cancerimagingarchive.net/pages/viewpage.action?pageId=70230281), [Stony Brook source](https://wiki.cancerimagingarchive.net/pages/viewpage.action?pageId=89096912), and [COVID-19 Radiography Database](https://www.kaggle.com/tawsifurrahman/covid19-radiography-database). Current collection-specific image license pages were not reachable/verified here. Review and record the exact releases' terms before training; do not assume the Kaggle wrapper or upstream software license grants image rights. |
 
+### Permission decision matrix
+
+| Material | Redistribution | Academic/research training | Nonacademic training | Sharing trained weights |
+| --- | --- | --- | --- | --- |
+| Kaggle version-7 wrapper | No blanket image permission established | Depends on every component source | Human review required | Not stated; human review required |
+| Cohen images | Depends on each row's Apache 2.0, CC BY 4.0, CC BY-NC-SA 4.0, or unknown value | Only when that image's recorded license permits the intended use | NC or unknown records require exclusion/review | Not expressly resolved here; review each applicable license and attribution duty |
+| BIMCV images | Dataset redistribution prohibited without written permission | Research use stated in the linked agreement | Case-by-case approval required | Agreement does not clearly authorize public weight distribution; obtain a decision |
+| Figure 1 and Actualmed images | No standalone redistribution permission verified | Source README says research purposes only | Human review required | Not stated; human review required |
+| RSNA, RICORD, Stony Brook, SIRM-derived images | Current exact-release permission not verified here | Human review required | Human review required | Human review required |
+| This project's original code | MIT `LICENSE` permits code redistribution | Permitted under MIT | Permitted under MIT | MIT applies to project code and does not grant rights in images or image-derived weights |
+
+“Training permitted” and “weights may be published” are separate questions. A
+model can retain information from restricted data, and none of the inspected
+dataset statements supplied blanket permission to publish derived weights. The
+owner must record a source-by-source decision before training or sharing a model.
+No Kaggle terms were accepted on the owner's behalf by this project.
+
 For a public portfolio, publish the code, reproducible instructions, and your
 permitted aggregate findings. Use only images and derived model artifacts whose
 terms permit your intended use. Do not publish patient-level manifests, image

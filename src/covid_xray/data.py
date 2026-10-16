@@ -16,6 +16,12 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from sklearn.model_selection import GroupShuffleSplit
 
 from covid_xray.config import CLASSES, IMAGE_SIZE, SEED
+from covid_xray.review import (
+    accepted_perceptual_groups,
+    build_duplicate_review,
+    enforce_official_duplicate_boundary,
+    write_duplicate_review,
+)
 
 REQUIRED = {"path", "label", "patient_id", "source", "sha256"}
 METADATA_REQUIRED = {"image_path", "label", "patient_id", "original_partition"}
@@ -191,6 +197,16 @@ def audit_metadata(frame, data_dir=None):
     content_label_counts = (
         audited[audited.sha256.ne("")].groupby("sha256").label.nunique()
     )
+    exact_partition_counts = (
+        audited[audited.sha256.ne("")]
+        .groupby("sha256")
+        .original_partition.nunique()
+    )
+    perceptual_partition_counts = (
+        audited[audited.perceptual_hash.ne("")]
+        .groupby("perceptual_hash")
+        .original_partition.nunique()
+    )
     status_counts = audited.validation_status.value_counts()
     accessible = audited[audited.file_exists]
     valid = audited[audited.readable]
@@ -243,8 +259,14 @@ def audit_metadata(frame, data_dir=None):
         ),
         "exact_duplicate_groups": exact_groups,
         "exact_duplicate_records": exact_records,
+        "cross_partition_exact_duplicate_groups": int(
+            exact_partition_counts.gt(1).sum()
+        ),
         "perceptual_match_groups": perceptual_groups,
         "perceptual_match_records": perceptual_records,
+        "cross_partition_perceptual_candidate_groups": int(
+            perceptual_partition_counts.gt(1).sum()
+        ),
         "patient_overlap_count": len(overlapping_patients),
         "patient_overlap_ids_sample": overlapping_patients[:20],
         "image_path_label_conflicts": int(path_label_counts.gt(1).sum()),
@@ -319,10 +341,12 @@ def validate_manifest(frame, check_files=True):
         if not (frame.original_split.eq("test") == frame.split.eq("test")).all():
             raise ValueError("The official test boundary was changed; restore its original assignments.")
     columns = ["patient_id", "sha256"]
-    if "perceptual_hash" in frame:
-        columns.append("perceptual_hash")
+    if "accepted_duplicate_group" in frame:
+        columns.append("accepted_duplicate_group")
     for column in columns:
-        if frame.groupby(column).split.nunique().gt(1).any():
+        values = frame[column].astype(str)
+        groups = frame[values.ne("")].groupby(column).split.nunique()
+        if groups.gt(1).any():
             raise ValueError(f"Leakage: {column} occurs across splits.")
     for name, part in frame.groupby("split"):
         if set(part.label) != set(CLASSES):
@@ -341,11 +365,13 @@ def _groups(frame):
         return i
 
     columns = ["patient_id", "sha256"]
-    if "perceptual_hash" in frame:
-        columns.append("perceptual_hash")
+    if "accepted_duplicate_group" in frame:
+        columns.append("accepted_duplicate_group")
     for column in columns:
         first = {}
         for i, value in enumerate(frame[column]):
+            if value == "":
+                continue
             if value in first:
                 parent[find(i)] = find(first[value])
             else:
@@ -375,7 +401,7 @@ def _holdout(frame, fraction, seed):
     return best
 
 
-def build_manifest(index, seed=SEED, test_size=0.15, val_size=0.15):
+def build_manifest(index, seed=SEED, test_size=0.15, val_size=0.15, review=None):
     """Preserve an official test set when present; otherwise group-split 70/15/15."""
     if not (0 < test_size < 1 and 0 < val_size < 1 and test_size + val_size < 1):
         raise ValueError("Split fractions must be positive and sum to less than one.")
@@ -390,6 +416,25 @@ def build_manifest(index, seed=SEED, test_size=0.15, val_size=0.15):
     _check_rows(frame)
     if set(frame.label) != set(CLASSES):
         raise ValueError("All three classes are required before splitting.")
+    decisions = None
+    if review is not None:
+        decisions = (
+            pd.read_csv(review, dtype=str, keep_default_na=False)
+            if isinstance(review, (str, Path))
+            else review
+        )
+    accepted_groups = set()
+    if "original_split" in frame:
+        duplicate_review = build_duplicate_review(frame, decisions)
+        enforce_official_duplicate_boundary(duplicate_review)
+        accepted_groups = accepted_perceptual_groups(duplicate_review)
+    elif decisions is not None:
+        accepted_groups = accepted_perceptual_groups(decisions)
+    frame["accepted_duplicate_group"] = frame.perceptual_hash.map(
+        lambda value: (
+            f"perceptual:{value}" if f"perceptual:{value}" in accepted_groups else ""
+        )
+    )
     frame["_group"] = _groups(frame)
     if "original_split" in frame:
         if frame.original_split.isna().any() or not set(frame.original_split).issubset({"train", "test"}):
@@ -468,6 +513,8 @@ def index_images(data_dir, patients, output):
     meta = pd.read_csv(patients, dtype=str, keep_default_na=False)
     if "path" not in meta and "image_path" in meta:
         meta = meta.rename(columns={"image_path": "path"})
+    if "original_split" not in meta and "original_partition" in meta:
+        meta = meta.rename(columns={"original_partition": "original_split"})
     required = {"path", "label", "patient_id", "source"}
     if not required.issubset(meta):
         raise ValueError(f"Patient CSV requires {sorted(required)}.")
@@ -502,6 +549,10 @@ def main():
     split.add_argument("--output", default="data/processed/manifest.csv")
     split.add_argument("--seed", type=int, default=SEED)
     split.add_argument("--val-size", type=float, default=0.15)
+    split.add_argument(
+        "--duplicate-review",
+        help="Private CSV containing accepted/rejected/unresolved group decisions",
+    )
     audit = commands.add_parser(
         "audit", help="Validate metadata and accessible images without creating splits"
     )
@@ -511,6 +562,19 @@ def main():
     audit.add_argument(
         "--report", default="artifacts/results/eda/data_quality_report.json"
     )
+    duplicates = commands.add_parser(
+        "duplicates", help="Create a private exact/perceptual duplicate review CSV"
+    )
+    duplicates.add_argument("--validated-metadata", required=True)
+    duplicates.add_argument(
+        "--output", default="artifacts/results/eda/duplicate_review.csv"
+    )
+    duplicates.add_argument("--decisions")
+    duplicates.add_argument(
+        "--summary", default="artifacts/results/eda/duplicate_review_summary.json"
+    )
+    duplicates.add_argument("--contact-sheets")
+    duplicates.add_argument("--max-contact-sheets", type=int)
     args = parser.parse_args()
     if args.command == "index":
         frame = index_images(args.data_dir, args.patients, args.output)
@@ -523,7 +587,12 @@ def main():
         path = Path(args.index).resolve()
         frame = pd.read_csv(path, dtype=str, keep_default_na=False)
         frame["path"] = frame.path.map(lambda p: str((path.parent / p).resolve()))
-        frame = build_manifest(frame, seed=args.seed, val_size=args.val_size)
+        frame = build_manifest(
+            frame,
+            seed=args.seed,
+            val_size=args.val_size,
+            review=args.duplicate_review,
+        )
         output = Path(args.output).resolve()
         output.parent.mkdir(parents=True, exist_ok=True)
         frame["path"] = frame.path.map(lambda p: os.path.relpath(p, output.parent))
@@ -533,11 +602,21 @@ def main():
             "output": args.output,
             "class_counts": frame.label.value_counts().to_dict(),
         }
-    else:
+    elif args.command == "audit":
         _, report = audit_metadata_file(
             args.metadata, args.data_dir, args.output, args.report
         )
         result = {**report, "output": args.output, "report": args.report}
+    else:
+        _, result = write_duplicate_review(
+            args.validated_metadata,
+            args.output,
+            decisions_path=args.decisions,
+            summary_path=args.summary,
+            contact_sheets=args.contact_sheets,
+            max_contact_sheets=args.max_contact_sheets,
+        )
+        result = {**result, "output": args.output, "summary": args.summary}
     print(json.dumps(result, indent=2))
 
 

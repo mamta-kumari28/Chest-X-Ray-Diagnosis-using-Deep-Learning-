@@ -26,10 +26,11 @@ Run from the latest repository checkout after mounting Drive. These commands do
 not train a model or create a final train/validation split.
 
 ```bash
-%cd /content/covid-xray-project
+%cd /content/Chest-X-Ray-Diagnosis-using-Deep-Learning-
 
 !PYTHONPATH=src python -m covid_xray.data duplicates \
   --validated-metadata "/content/drive/MyDrive/covidx-cxr3a-v7/processed/validated_metadata.csv" \
+  --data-dir "/content/drive/MyDrive/covidx-cxr3a-v7" \
   --output "/content/drive/MyDrive/covidx-cxr3a-v7/eda/private/duplicate_review.csv" \
   --summary "/content/drive/MyDrive/covidx-cxr3a-v7/eda/duplicate_review_summary.json" \
   --contact-sheets "/content/drive/MyDrive/covidx-cxr3a-v7/eda/private/contact_sheets"

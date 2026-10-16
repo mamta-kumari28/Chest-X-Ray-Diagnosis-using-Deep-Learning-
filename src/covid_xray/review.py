@@ -220,11 +220,15 @@ def enforce_official_duplicate_boundary(review: pd.DataFrame) -> None:
 
 
 def create_contact_sheets(
-    review: pd.DataFrame, output: str | Path, max_groups: int | None = None
+    review: pd.DataFrame,
+    output: str | Path,
+    max_groups: int | None = None,
+    data_dir: str | Path | None = None,
 ) -> int:
     """Write private contact sheets for authorized human review."""
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
+    data_root = Path(data_dir).expanduser().resolve() if data_dir else None
     groups = list(review.groupby("group_id", sort=True))
     if max_groups is not None:
         if max_groups < 1:
@@ -234,7 +238,13 @@ def create_contact_sheets(
     for group_id, group in groups:
         cards = []
         for row in group.itertuples():
-            path = Path(getattr(row, "resolved_path", row.image_path))
+            path = Path(getattr(row, "resolved_path", ""))
+            if not path.is_file() and data_root:
+                path = (data_root / row.image_path).resolve()
+                if not path.is_relative_to(data_root):
+                    raise ValueError("Review image path leaves the configured data directory.")
+            if not path.is_file():
+                path = Path(row.image_path)
             if not path.is_file():
                 continue
             with Image.open(path) as source:
@@ -268,6 +278,7 @@ def write_duplicate_review(
     summary_path: str | Path | None = None,
     contact_sheets: str | Path | None = None,
     max_contact_sheets: int | None = None,
+    data_dir: str | Path | None = None,
 ) -> tuple[pd.DataFrame, dict[str, int]]:
     """Create private review artifacts from a locally validated metadata CSV."""
     frame = pd.read_csv(validated_metadata, dtype=str, keep_default_na=False)
@@ -287,6 +298,6 @@ def write_duplicate_review(
         summary_path.write_text(json.dumps(summary, indent=2))
     if contact_sheets:
         summary["contact_sheets_written"] = create_contact_sheets(
-            review, contact_sheets, max_contact_sheets
+            review, contact_sheets, max_contact_sheets, data_dir
         )
     return review, summary

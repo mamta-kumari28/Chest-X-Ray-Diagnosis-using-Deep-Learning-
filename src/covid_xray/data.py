@@ -567,6 +567,10 @@ def main():
     )
     duplicates.add_argument("--validated-metadata", required=True)
     duplicates.add_argument(
+        "--data-dir",
+        help="Persistent image root used when validated resolved paths are stale",
+    )
+    duplicates.add_argument(
         "--output", default="artifacts/results/eda/duplicate_review.csv"
     )
     duplicates.add_argument("--decisions")
@@ -615,6 +619,7 @@ def main():
             summary_path=args.summary,
             contact_sheets=args.contact_sheets,
             max_contact_sheets=args.max_contact_sheets,
+            data_dir=args.data_dir,
         )
         result = {**result, "output": args.output, "summary": args.summary}
     print(json.dumps(result, indent=2))

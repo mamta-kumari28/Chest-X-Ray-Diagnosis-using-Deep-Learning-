@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -25,6 +26,9 @@ def code(text: str) -> dict:
 
 
 def notebook(cells: list[dict]) -> dict:
+    for position, cell in enumerate(cells):
+        source = "".join(cell.get("source", []))
+        cell["id"] = hashlib.sha256(f"{position}:{source}".encode()).hexdigest()[:12]
     return {
         "cells": cells,
         "metadata": {

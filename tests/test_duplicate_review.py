@@ -1,5 +1,7 @@
 """Duplicate review stays private, explicit, and fail-closed at test boundaries."""
 
+from pathlib import Path
+
 import pandas as pd
 import pytest
 from PIL import Image
@@ -116,8 +118,13 @@ def test_contact_sheet_uses_only_existing_authorized_local_images(
     frame = _official_index(image_index)
     frame.loc[1, "perceptual_hash"] = frame.loc[0, "perceptual_hash"]
     review = build_duplicate_review(frame)
+    data_dir = Path(frame.loc[0, "path"]).parent
+    review["image_path"] = review.image_path.map(lambda value: Path(value).name)
+    review["resolved_path"] = "/content/expired-runtime/image.png"
 
-    written = create_contact_sheets(review, tmp_path / "private", max_groups=1)
+    written = create_contact_sheets(
+        review, tmp_path / "private", max_groups=1, data_dir=data_dir
+    )
 
     assert written == 1
     output = next((tmp_path / "private").glob("*.jpg"))

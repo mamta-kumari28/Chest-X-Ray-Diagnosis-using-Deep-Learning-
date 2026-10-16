@@ -192,8 +192,8 @@ local repository layout and a mounted Drive layout are supported:
 ```python
 import os
 
-os.environ["COVIDX_DATA_DIR"] = "/content/drive/MyDrive/covidx-cxr3a-v7/images"
-os.environ["COVIDX_LABEL_DIR"] = "/content/drive/MyDrive/covidx-cxr3a-v7/labels"
+os.environ["COVIDX_DATA_DIR"] = "/content/drive/MyDrive/covidx-cxr3a-v7"
+os.environ["COVIDX_LABEL_DIR"] = "/content/drive/MyDrive/covidx-cxr3a-v7/labels_cxr3a"
 os.environ["COVIDX_METADATA"] = "/content/drive/MyDrive/covidx-cxr3a-v7/processed/patients.csv"
 ```
 
@@ -210,9 +210,9 @@ os.environ["KAGGLE_KEY"] = userdata.get("KAGGLE_KEY")
 
 ```bash
 !python -m pip install kaggle
-!mkdir -p "/content/drive/MyDrive/covidx-cxr3a-v7/images"
+!mkdir -p "/content/drive/MyDrive/covidx-cxr3a-v7"
 !kaggle datasets download andyczhao/covidx-cxr2/7 \
-  --path "/content/drive/MyDrive/covidx-cxr3a-v7/images" --unzip
+  --path "/content/drive/MyDrive/covidx-cxr3a-v7" --unzip
 ```
 
 Then open and run `notebooks/02_preprocessing.ipynb`, followed by

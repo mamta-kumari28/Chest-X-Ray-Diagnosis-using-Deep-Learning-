@@ -35,8 +35,9 @@ performed against Phase 1 on `main` before creating `phase2/dataset-eda`.
 
 The two pinned upstream label files were reachable and their documented SHA-256
 checksums and row counts were verified on 2026-10-16. Direct access to the
-Kaggle version-7 archive was blocked by this environment's proxy, and no medical
-image archive was present locally. Therefore no real-data charts, local image
-counts, or patient-level observations were committed. Follow
-`docs/DATASET.md` in an authorized Colab or local environment to generate them.
+Kaggle version-7 archive was blocked by the development environment's proxy.
+The repository owner subsequently ran the supplied workflow in an authorized
+Google Colab session against the complete archive. Its aggregate findings are
+recorded in `docs/PHASE2_RESULTS.md`. Medical images, patient-level CSV files,
+and the sample-image montage remain outside Git.
 

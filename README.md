@@ -1,5 +1,9 @@
 # COVID-19 Chest X-Ray Detection using Deep Learning
 
+[![Open training notebook in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mamta-kumari28/Chest-X-Ray-Diagnosis-using-Deep-Learning-/blob/main/notebooks/train_colab.ipynb)
+
+For the remaining account-owned actions, use the short [completion checklist](docs/NEXT_STEPS.md).
+
 A reproducible, three-class image-classification project with a custom TensorFlow/Keras CNN, patient-aware data preparation, exploratory analysis, held-out evaluation, and a Streamlit interface.
 
 **Project status:** implementation and local functional checks are available. No real chest X-ray dataset has been downloaded in this workspace, no clinical model has been trained, and no medical performance numbers or live deployment are claimed. The app opens without a model and keeps predictions disabled until a verified trained artifact bundle is installed.

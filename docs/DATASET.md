@@ -287,11 +287,12 @@ auditable cohort is preferable to an unsupported 30,000-image claim.
 ## What has and has not happened
 
 The HTTPS author instructions, pinned label files, patient/count checks, and
-specific license evidence above were inspected. No full image dataset was
-downloaded, no real-data EDA or GPU training was performed during dataset research,
-and no evaluation scores are asserted. Real sample plots, split class counts,
-training curves, and test metrics must be generated from an authorized local
-dataset by the supplied project workflow.
+specific license evidence above were inspected. The repository owner later ran
+the supplied validation and EDA workflow against the complete version-7 archive
+in an authorized Google Colab session. The aggregate observations are documented
+in [the Phase 2 results](PHASE2_RESULTS.md). No GPU model training was performed
+and no accuracy or other model-evaluation score is asserted. Patient-level files,
+medical images, and the sample-image montage remain local.
 
 For dataset attribution, cite the COVID-Net authors and every used source
 collection. The original COVID-Net paper is Wang, Lin, and Wong (2020),

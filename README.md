@@ -40,8 +40,8 @@ scripts/
   import_covidx_metadata.py  Version-specific genuine patient metadata importer
   download_model.py         Explicit HTTPS artifact download with checksum checks
 notebooks/
-  01_data_exploration.ipynb  Manifest-based EDA through the package
-  02_preprocessing.ipynb     Metadata import, indexing, safe splitting
+  01_data_exploration.ipynb  Validated Phase 2 EDA through the package
+  02_preprocessing.ipynb     Metadata import and audit; no final split
   03_cnn_training.ipynb      GPU training through covid_xray.train
   04_model_evaluation.ipynb  Held-out evaluation through covid_xray.evaluate
   train_colab.ipynb          Retained end-to-end Colab workflow
@@ -92,6 +92,14 @@ python -m covid_xray.eda \
 The Phase 2 metadata contains `image_path`, `label`, `patient_id`, `original_partition`, `source`, local resolution status, and candidate count. The audited CSV adds actual file availability, decode status, dimensions, exact pixel hashes, and perceptual hashes. Missing or ambiguous files remain visible for reporting. Custom data must supply genuine, consistently namespaced patient identifiers; filenames and row numbers are never accepted as inferred IDs.
 
 The official 400-record test partition is preserved exactly in Phase 2. Patient overlap, exact duplicates, perceptual-hash candidates, label conflicts, missing files, corrupt images, unsupported formats, and dimensions are reported without moving records. Phase 3 must review these findings before deriving a validation split from the official training pool.
+
+An authorized Google Colab run validated all **30,034** CXR-3A records against
+**30,034** readable local image files. It found no missing, corrupt, unsupported,
+ambiguous, or path-conflicting files; no conflicting labels; and no patient ID
+overlap across the official train/test boundary. It also found 8 exact decoded-image
+duplicate groups (17 records) and 242 matching perceptual-hash groups (581 records).
+Those groups remain Phase 3 review inputs rather than evidence of independent
+images. See [the verified Phase 2 results](docs/PHASE2_RESULTS.md).
 
 Exact duplicates are detected using decoded RGB pixel hashes, including duplicates whose file metadata differs. A 64-bit perceptual hash additionally groups matching low-frequency signatures, which can catch resized/recompressed copies; such matches are grouped conservatively, not treated as proof of identity. Patient IDs and duplicate hashes connect into groups, including transitive connections. Cross-label exact-duplicate conflicts or official train/test leakage stop the workflow. Loading a manifest recomputes hashes to detect altered images. These checks cannot recover missing patient identities or prove that different perceptual hashes represent unrelated images: manually audit suspicious source overlap, near-matching hashes, and transformed duplicates before making generalization claims. Source-specific preprocessing and hospital artifacts can also leak the label despite disjoint patients.
 

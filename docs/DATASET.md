@@ -101,22 +101,22 @@ The metadata importer intentionally does not claim to grant or check image right
 4. Fetch the small official label files with normal HTTPS certificate checks:
 
    ```bash
-   mkdir -p data/metadata
+   mkdir -p data/raw data/processed
    curl --fail --location --proto '=https' --tlsv1.2 \
      https://raw.githubusercontent.com/lindawangg/COVID-Net/9645505646161c7eae5fc1a8ecbfa34a77551f2f/labels/train_COVIDx_CXR-3A.txt \
-     --output data/metadata/train_COVIDx_CXR-3A.txt
+     --output data/raw/train_COVIDx_CXR-3A.txt
    curl --fail --location --proto '=https' --tlsv1.2 \
      https://raw.githubusercontent.com/lindawangg/COVID-Net/9645505646161c7eae5fc1a8ecbfa34a77551f2f/labels/test_COVIDx_CXR-3A.txt \
-     --output data/metadata/test_COVIDx_CXR-3A.txt
+     --output data/raw/test_COVIDx_CXR-3A.txt
    ```
 
 5. Convert labels into the project's metadata schema:
 
    ```bash
    python scripts/import_covidx_metadata.py \
-     --labels data/metadata/train_COVIDx_CXR-3A.txt data/metadata/test_COVIDx_CXR-3A.txt \
+     --labels data/raw/train_COVIDx_CXR-3A.txt data/raw/test_COVIDx_CXR-3A.txt \
      --data-dir data/raw/covidx \
-     --output data/metadata/patients.csv
+     --output data/processed/patients.csv
    ```
 
    The importer rejects missing images, duplicate filenames, changed labels,
@@ -127,7 +127,7 @@ The metadata importer intentionally does not claim to grant or check image right
 
    ```bash
    python -m covid_xray.data index --data-dir data/raw/covidx \
-     --patients data/metadata/patients.csv --output data/processed/index.csv
+     --patients data/processed/patients.csv --output data/processed/index.csv
    python -m covid_xray.data split --index data/processed/index.csv \
      --output data/processed/manifest.csv --val-size 0.15
    ```

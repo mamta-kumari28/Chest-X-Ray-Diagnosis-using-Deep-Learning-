@@ -1,7 +1,7 @@
 """Download a reviewed model bundle from HTTPS, verifying its published checksum.
 
 Example: python scripts/download_model.py --base-url https://host/release \
-    --sha256 <trusted-published-model-sha256> --output artifacts
+    --sha256 <trusted-published-model-sha256> --output artifacts/models
 Never load model files from unknown publishers. A checksum proves integrity,
 not model quality or clinical validity.
 """
@@ -72,7 +72,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", required=True)
     parser.add_argument("--sha256", required=True)
-    parser.add_argument("--output", default="artifacts")
+    parser.add_argument("--output", default="artifacts/models")
     args = parser.parse_args()
     try:
         download_bundle(args.base_url, args.sha256, args.output)

@@ -39,11 +39,19 @@ src/covid_xray/
 scripts/
   import_covidx_metadata.py  Version-specific genuine patient metadata importer
   download_model.py         Explicit HTTPS artifact download with checksum checks
-notebooks/train_colab.ipynb  Reproducible Colab GPU workflow, no saved outputs
+notebooks/
+  01_data_exploration.ipynb  Manifest-based EDA through the package
+  02_preprocessing.ipynb     Metadata import, indexing, safe splitting
+  03_cnn_training.ipynb      GPU training through covid_xray.train
+  04_model_evaluation.ipynb  Held-out evaluation through covid_xray.evaluate
+  train_colab.ipynb          Retained end-to-end Colab workflow
 tests/                       Data integrity, model, inference, app, evaluation tests
 docs/                        Dataset, deployment, and model-card documentation
-data/                        Ignored local data and manifests
-artifacts/                   Ignored model, figures, and evaluation output
+data/raw/                    Ignored local licensed medical data
+data/processed/              Ignored local indexes and manifests
+artifacts/models/            Ignored model checkpoints and training history
+artifacts/results/           Ignored EDA and evaluation reports
+sample_images/               Ignored licensed demo-image location
 ```
 
 ## Local setup
@@ -71,18 +79,18 @@ For the exact tested **Linux/Python 3.12 CPU development environment**, replace 
 
 ```bash
 python scripts/import_covidx_metadata.py \
-  --labels data/metadata/train_COVIDx_CXR-3A.txt data/metadata/test_COVIDx_CXR-3A.txt \
-  --data-dir data/raw/covidx --output data/metadata/patients.csv
+  --labels data/raw/train_COVIDx_CXR-3A.txt data/raw/test_COVIDx_CXR-3A.txt \
+  --data-dir data/raw/covidx --output data/processed/patients.csv
 
 python -m covid_xray.data index \
-  --data-dir data/raw/covidx --patients data/metadata/patients.csv \
+  --data-dir data/raw/covidx --patients data/processed/patients.csv \
   --output data/processed/index.csv
 
 python -m covid_xray.data split \
   --index data/processed/index.csv --output data/processed/manifest.csv
 
 python -m covid_xray.eda \
-  --manifest data/processed/manifest.csv --output artifacts/eda
+  --manifest data/processed/manifest.csv --output artifacts/results/eda
 ```
 
 The DataFrame contains `path`, `label`, `patient_id`, `source`, decoded-pixel `sha256`, `perceptual_hash`, `original_split`, and `split`. Paths are stored relative to the manifest so the data tree can move together. The importer fails if metadata checksums differ, filenames are missing or ambiguous, or IDs have conflicting source identities. Custom data must supply genuine, consistently namespaced patient identifiers; filenames and row numbers are never accepted as inferred IDs.
@@ -95,16 +103,16 @@ EDA saves Pandas count tables, Seaborn class/split plots, training sample previe
 
 ## Train on a Colab GPU
 
-Open [notebooks/train_colab.ipynb](notebooks/train_colab.ipynb) in Google Colab. Choose **Runtime → Change runtime type → GPU** and use Python 3.11/3.12. The notebook explains cloning this repository, dependency installation, version-pinned metadata downloads, private dataset placement, preprocessing, training, evaluation, and private model export. Use the repository's actual GitHub URL and branch after you publish these files.
+Use the focused notebooks in numeric order for portfolio review. The retained [end-to-end Colab notebook](notebooks/train_colab.ipynb) provides the same complete workflow in one place. Choose **Runtime → Change runtime type → GPU** for training and use Python 3.11/3.12. All notebooks call the existing `covid_xray` package rather than carrying separate implementations.
 
 The same commands run from a configured GPU checkout:
 
 ```bash
 python -m covid_xray.train --manifest data/processed/manifest.csv \
-  --output artifacts --epochs 30 --batch-size 32
+  --output artifacts/models --epochs 30 --batch-size 32
 
 python -m covid_xray.evaluate --manifest data/processed/manifest.csv \
-  --model artifacts/model.keras --output artifacts/evaluation
+  --model artifacts/models/model.keras --output artifacts/results
 ```
 
 The CNN includes Conv2D, BatchNormalization, MaxPooling2D, Dropout, global average pooling, and Dense layers. Images become RGB at **224 × 224**. The saved model normalizes pixels with `Rescaling(1/255)` and applies small rotation, translation, and zoom **only during training**. Training, validation, and serving use the same pixel-range contract. Class weights are computed on training data only. Bounded parallel `tf.data` workers, batching, and prefetching avoid caching the full dataset in memory.
@@ -121,13 +129,13 @@ Investigate false-negative COVID-19 cases and false positives separately, review
 
 ## Web app and deployment
 
-Run `streamlit run app.py` to preview the interface. Install the actual trained bundle into `artifacts/`, or configure `MODEL_PATH` to a `.keras` file with its JSON companions. The app verifies checksums and class order, checks actual image content and size, previews uploads, and plots all three class scores. It cannot determine whether an arbitrary valid image is a chest X-ray.
+Run `streamlit run app.py` to preview the interface. Install the actual trained bundle into `artifacts/models/`, or configure `MODEL_PATH` to a `.keras` file with its JSON companions. The app verifies checksums and class order, checks actual image content and size, previews uploads, and plots all three class scores. It cannot determine whether an arbitrary valid image is a chest X-ray.
 
 For large files, publish a permitted, evaluated model bundle separately and use:
 
 ```bash
 python scripts/download_model.py --base-url https://YOUR-HOST/VERSION \
-  --sha256 YOUR_TRUSTED_MODEL_SHA256 --output artifacts
+  --sha256 YOUR_TRUSTED_MODEL_SHA256 --output artifacts/models
 ```
 
 The URL and checksum above are placeholders; no trained model download is presently published. [Deployment instructions](docs/DEPLOYMENT.md) cover Streamlit Community Cloud and container/VM hosting, optional explicit artifact provisioning, and manual deployment actions. No deployment is performed automatically by this repository.

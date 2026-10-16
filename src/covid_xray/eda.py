@@ -79,7 +79,7 @@ def create_report(manifest, output):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", required=True)
-    parser.add_argument("--output", default="artifacts/eda")
+    parser.add_argument("--output", default="artifacts/results/eda")
     args = parser.parse_args()
     create_report(args.manifest, args.output)
 

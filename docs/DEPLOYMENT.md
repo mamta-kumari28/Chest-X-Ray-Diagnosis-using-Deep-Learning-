@@ -26,9 +26,10 @@ Follow the Colab training instructions and evaluate the held-out test split firs
 
 ```text
 artifacts/
-├── model.keras
-├── class_names.json
-└── model_metadata.json
+└── models/
+    ├── model.keras
+    ├── class_names.json
+    └── model_metadata.json
 ```
 
 `class_names.json` is a JSON list in this exact order:
@@ -59,7 +60,7 @@ The model accepts RGB float32 pixels in **0–255**. Normalization is embedded i
 
 ## Download large model artifacts
 
-Keep model files and datasets out of Git. Publish your own evaluated artifact bundle to a versioned GitHub Release or another suitable HTTPS artifact host only when you choose to publish. Confirm that your dataset and model redistribution terms permit publication. Record the download location and a separately obtained trusted SHA-256 for each file. Use the repository's checksum-verifying helper; see its exact options with:
+Keep model files and datasets out of Git. Local model files live under `artifacts/models/`; evaluation reports live under `artifacts/results/`. Publish your own evaluated artifact bundle to a versioned GitHub Release or another suitable HTTPS artifact host only when you choose to publish. Confirm that your dataset and model redistribution terms permit publication. Record the download location and a separately obtained trusted SHA-256 for each file. Use the repository's checksum-verifying helper; see its exact options with:
 
 ```bash
 python scripts/download_model.py --help
@@ -73,7 +74,7 @@ For example, after you publish a reviewed public release containing the three fi
 python scripts/download_model.py \
   --base-url https://github.com/YOUR_ACCOUNT/YOUR_REPOSITORY/releases/download/YOUR_MODEL_TAG \
   --sha256 YOUR_TRUSTED_64_CHARACTER_LOWERCASE_SHA256 \
-  --output artifacts
+  --output artifacts/models
 streamlit run app.py
 ```
 

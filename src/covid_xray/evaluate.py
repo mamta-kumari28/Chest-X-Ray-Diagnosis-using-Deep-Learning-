@@ -287,8 +287,8 @@ def evaluate(
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=Path, required=True)
-    parser.add_argument("--model", type=Path, default=Path("artifacts/model.keras"))
-    parser.add_argument("--output", type=Path, default=Path("artifacts/evaluation"))
+    parser.add_argument("--model", type=Path, default=Path("artifacts/models/model.keras"))
+    parser.add_argument("--output", type=Path, default=Path("artifacts/results"))
     parser.add_argument("--batch-size", type=int, default=32)
     args = parser.parse_args()
     evaluate(**vars(args))

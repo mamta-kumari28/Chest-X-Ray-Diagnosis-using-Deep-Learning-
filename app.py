@@ -109,7 +109,7 @@ def main(configure_page: bool = True) -> None:
             st.markdown(
                 "1. Train and evaluate the model using the repository's Google Colab notebook.\n"
                 "2. Export `model.keras`, `class_names.json`, and `model_metadata.json`.\n"
-                "3. Place the three files in `artifacts/`, or set `MODEL_PATH` to your `.keras` file.\n"
+                "3. Place the three files in `artifacts/models/`, or set `MODEL_PATH` to your `.keras` file.\n"
                 "4. Restart this app. See `docs/DEPLOYMENT.md` for a checksum-verified download workflow."
             )
             st.caption("No demonstration or random predictions are substituted for a trained model.")

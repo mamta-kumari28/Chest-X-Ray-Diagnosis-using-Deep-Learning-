@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from pathlib import Path
 
 
@@ -42,8 +43,10 @@ def notebook(cells: list[dict]) -> dict:
 
 BOOTSTRAP = r'''from pathlib import Path
 import os
+import shutil
 import subprocess
 import sys
+import zipfile
 
 REPO_URL = "https://github.com/mamta-kumari28/Chest-X-Ray-Diagnosis-using-Deep-Learning-.git"
 REPO_REF = "phase2/final-validation-fixes"  # Change to main after the PR is merged.
@@ -51,7 +54,21 @@ ROOT = Path("/kaggle/working/covid-xray-project")
 OUTPUT_ROOT = Path("/kaggle/working/covid_xray_outputs")
 
 if not ROOT.exists():
-    subprocess.run(["git", "clone", "--branch", REPO_REF, "--depth", "1", REPO_URL, str(ROOT)], check=True)
+    source_archives = sorted(Path("/kaggle/input").glob("**/covid_xray_project_source.zip"))
+    if source_archives:
+        with zipfile.ZipFile(source_archives[0]) as archive:
+            archive.extractall("/kaggle/working")
+        print("Loaded project source from:", source_archives[0])
+    else:
+        extracted_sources = [
+            path.parent for path in Path("/kaggle/input").glob("**/pyproject.toml")
+            if (path.parent / "src" / "covid_xray").is_dir()
+        ]
+        if extracted_sources:
+            shutil.copytree(extracted_sources[0], ROOT)
+            print("Loaded extracted project source from:", extracted_sources[0])
+        else:
+            subprocess.run(["git", "clone", "--branch", REPO_REF, "--depth", "1", REPO_URL, str(ROOT)], check=True)
 os.chdir(ROOT)
 subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-e", ".", "--no-deps"], check=True)
 OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
@@ -262,3 +279,22 @@ print("Experimental research output; not a medical diagnosis.")'''),
 )
 
 print(f"Built Kaggle notebooks in {OUTPUT}")
+
+# Kaggle can load this source archive as an Input without GitHub credentials.
+archive_base = OUTPUT / "covid_xray_project_source"
+if archive_base.with_suffix(".zip").exists():
+    archive_base.with_suffix(".zip").unlink()
+staging = ROOT / ".kaggle_source_staging" / "covid-xray-project"
+if staging.parent.exists():
+    shutil.rmtree(staging.parent)
+staging.mkdir(parents=True)
+for name in ("src", "scripts", "pyproject.toml", "requirements.txt", "README.md", "docs"):
+    source = ROOT / name
+    target = staging / name
+    if source.is_dir():
+        shutil.copytree(source, target, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    else:
+        shutil.copy2(source, target)
+shutil.make_archive(str(archive_base), "zip", staging.parent, "covid-xray-project")
+shutil.rmtree(staging.parent)
+print(f"Built Kaggle source archive: {archive_base.with_suffix('.zip')}")

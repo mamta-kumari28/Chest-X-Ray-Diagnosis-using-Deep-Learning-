@@ -75,31 +75,29 @@ For the exact tested **Linux/Python 3.12 CPU development environment**, replace 
 ## Prepare data and explore
 
 1. Follow [docs/DATASET.md](docs/DATASET.md) to download the exact CXR-3A images and its two pinned label files. Keep downloaded images outside Git under `data/raw/covidx/`. The latest COVIDx release is not interchangeable with CXR-3A.
-2. Convert the original patient metadata, index images, and build the manifest:
+2. Convert the official labels into metadata, audit local files, and generate EDA. Phase 2 preserves the official partitions and does not create final training splits:
 
 ```bash
 python scripts/import_covidx_metadata.py \
   --labels data/raw/train_COVIDx_CXR-3A.txt data/raw/test_COVIDx_CXR-3A.txt \
   --data-dir data/raw/covidx --output data/processed/patients.csv
 
-python -m covid_xray.data index \
-  --data-dir data/raw/covidx --patients data/processed/patients.csv \
-  --output data/processed/index.csv
-
-python -m covid_xray.data split \
-  --index data/processed/index.csv --output data/processed/manifest.csv
-
 python -m covid_xray.eda \
-  --manifest data/processed/manifest.csv --output artifacts/results/eda
+  --metadata data/processed/patients.csv \
+  --data-dir data/raw/covidx \
+  --validated-output data/processed/validated_metadata.csv \
+  --output artifacts/results/eda
 ```
 
-The DataFrame contains `path`, `label`, `patient_id`, `source`, decoded-pixel `sha256`, `perceptual_hash`, `original_split`, and `split`. Paths are stored relative to the manifest so the data tree can move together. The importer fails if metadata checksums differ, filenames are missing or ambiguous, or IDs have conflicting source identities. Custom data must supply genuine, consistently namespaced patient identifiers; filenames and row numbers are never accepted as inferred IDs.
+The Phase 2 metadata contains `image_path`, `label`, `patient_id`, `original_partition`, `source`, local resolution status, and candidate count. The audited CSV adds actual file availability, decode status, dimensions, exact pixel hashes, and perceptual hashes. Missing or ambiguous files remain visible for reporting. Custom data must supply genuine, consistently namespaced patient identifiers; filenames and row numbers are never accepted as inferred IDs.
 
-The official 400-image test set is preserved. Approximately 15% of the official training pool becomes validation data, with whole connected patient/duplicate groups kept together. Group sizes can change exact proportions. Without official assignments, custom data uses approximately 70/15/15 train/validation/test. Every split must contain all three classes.
+The official 400-record test partition is preserved exactly in Phase 2. Patient overlap, exact duplicates, perceptual-hash candidates, label conflicts, missing files, corrupt images, unsupported formats, and dimensions are reported without moving records. Phase 3 must review these findings before deriving a validation split from the official training pool.
 
 Exact duplicates are detected using decoded RGB pixel hashes, including duplicates whose file metadata differs. A 64-bit perceptual hash additionally groups matching low-frequency signatures, which can catch resized/recompressed copies; such matches are grouped conservatively, not treated as proof of identity. Patient IDs and duplicate hashes connect into groups, including transitive connections. Cross-label exact-duplicate conflicts or official train/test leakage stop the workflow. Loading a manifest recomputes hashes to detect altered images. These checks cannot recover missing patient identities or prove that different perceptual hashes represent unrelated images: manually audit suspicious source overlap, near-matching hashes, and transformed duplicates before making generalization claims. Source-specific preprocessing and hospital artifacts can also leak the label despite disjoint patients.
 
-EDA saves Pandas count tables, Seaborn class/split plots, training sample previews, and a dimension plot for up to 1,000 training images. No real-data plots are included until you run this step. Sample previews remain local because source-image redistribution rights vary.
+When readable local images are available, EDA saves `class_distribution.png`, `sample_images.png`, `image_dimensions.png`, `dataset_summary.csv`, and `data_quality_report.json` under `artifacts/results/eda/`. Metadata-record counts and actually validated local-image counts are shown separately. No real-data plots are included in Git; sample previews remain local because source-image redistribution rights vary.
+
+For Google Colab, open `notebooks/02_preprocessing.ipynb`, optionally mount Drive, and set `COVIDX_DATA_DIR` and `COVIDX_LABEL_DIR` to the extracted version-7 images and pinned label-file folder. Then run `notebooks/01_data_exploration.ipynb` with the same `COVIDX_DATA_DIR`. Dataset-host login, acceptance of terms, and any private credentials remain manual account actions.
 
 ## Train on a Colab GPU
 

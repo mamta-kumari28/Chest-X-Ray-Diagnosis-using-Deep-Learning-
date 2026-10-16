@@ -102,26 +102,98 @@ def resolve_image_paths(rows: list[dict[str, str]], data_dir: Path) -> list[dict
     return result
 
 
+def map_image_paths(
+    rows: list[dict[str, str]], data_dir: Path
+) -> list[dict[str, str | int]]:
+    """Map available files while retaining missing/ambiguous metadata for audit."""
+    root = data_dir.resolve(strict=True)
+    if not root.is_dir():
+        raise ValueError(f"Not an image directory: {data_dir}.")
+    files: dict[str, list[Path]] = {}
+    for path in root.rglob("*"):
+        if path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES:
+            resolved = path.resolve()
+            if not resolved.is_relative_to(root):
+                raise ValueError(f"Image symlink leaves the dataset directory: {path.name}.")
+            files.setdefault(path.name, []).append(path)
+
+    result: list[dict[str, str | int]] = []
+    for row in rows:
+        matches = files.get(row["path"], [])
+        image_path = (
+            matches[0].relative_to(root).as_posix() if len(matches) == 1 else row["path"]
+        )
+        resolution_status = {0: "missing", 1: "found"}.get(len(matches), "ambiguous")
+        result.append(
+            {
+                "image_path": image_path,
+                "label": row["label"],
+                "patient_id": row["patient_id"],
+                "original_partition": row["original_split"],
+                "source": row["source"],
+                "resolution_status": resolution_status,
+                "candidate_count": len(matches),
+            }
+        )
+    return result
+
+
 def main() -> None:
-    """Write a manifest only after every image and upstream ID passes checks."""
+    """Write verified upstream metadata and report local path resolution."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--labels", nargs="+", required=True, type=Path)
     parser.add_argument("--data-dir", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument(
+        "--require-all-images",
+        action="store_true",
+        help="Fail instead of retaining missing or ambiguous records for Phase 2 audit.",
+    )
     args = parser.parse_args()
     try:
         if args.output.exists():
             raise ValueError(f"Output already exists: {args.output}. Choose a new path to preserve existing metadata.")
-        rows = resolve_image_paths(read_labels(args.labels), args.data_dir)
+        source_rows = read_labels(args.labels)
+        if args.require_all_images:
+            resolved = resolve_image_paths(source_rows, args.data_dir)
+            rows = [
+                {
+                    "image_path": row["path"],
+                    "label": row["label"],
+                    "patient_id": row["patient_id"],
+                    "original_partition": row["original_split"],
+                    "source": row["source"],
+                    "resolution_status": "found",
+                    "candidate_count": 1,
+                }
+                for row in resolved
+            ]
+        else:
+            rows = map_image_paths(source_rows, args.data_dir)
         args.output.parent.mkdir(parents=True, exist_ok=True)
         # Exclusive creation avoids overwriting a concurrently created manifest.
         with args.output.open("x", newline="", encoding="utf-8") as file:
-            writer = csv.DictWriter(file, fieldnames=["path", "patient_id", "source", "label", "original_split"])
+            writer = csv.DictWriter(
+                file,
+                fieldnames=[
+                    "image_path",
+                    "label",
+                    "patient_id",
+                    "original_partition",
+                    "source",
+                    "resolution_status",
+                    "candidate_count",
+                ],
+            )
             writer.writeheader()
             writer.writerows(rows)
     except (OSError, UnicodeError, ValueError) as exc:
         parser.exit(2, f"Metadata import failed: {exc}\n")
     print(f"Wrote {len(rows):,} image records to {args.output}.")
+    counts = {}
+    for row in rows:
+        counts[row["resolution_status"]] = counts.get(row["resolution_status"], 0) + 1
+    print(f"Local path resolution: {counts}.")
     print("Patient IDs are upstream identities; verify source provenance and licenses before training.")
 
 

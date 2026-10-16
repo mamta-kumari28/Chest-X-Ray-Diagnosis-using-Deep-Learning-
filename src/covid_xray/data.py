@@ -12,12 +12,13 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, UnidentifiedImageError
 from sklearn.model_selection import GroupShuffleSplit
 
 from covid_xray.config import CLASSES, IMAGE_SIZE, SEED
 
 REQUIRED = {"path", "label", "patient_id", "source", "sha256"}
+METADATA_REQUIRED = {"image_path", "label", "patient_id", "original_partition"}
 EXTENSIONS = {".png", ".jpg", ".jpeg"}
 
 
@@ -47,6 +48,231 @@ def perceptual_hash(path):
     bits = low > np.median(low[1:])
     bits[0] = False  # Ignore overall brightness (the DC coefficient).
     return np.packbits(bits).tobytes().hex()
+
+
+def normalize_metadata(frame):
+    """Return canonical Phase 2 metadata without inventing patient information."""
+    metadata = frame.copy()
+    if "image_path" not in metadata and "path" in metadata:
+        metadata = metadata.rename(columns={"path": "image_path"})
+    missing = METADATA_REQUIRED - set(metadata.columns)
+    if missing:
+        raise ValueError(f"Missing metadata columns: {sorted(missing)}")
+    if metadata.empty:
+        raise ValueError("Dataset metadata is empty.")
+    for column in METADATA_REQUIRED:
+        values = metadata[column]
+        if values.isna().any() or values.astype(str).str.strip().eq("").any():
+            raise ValueError(f"Missing or empty metadata value: {column}.")
+        metadata[column] = values.astype(str).str.strip()
+    placeholders = {"unknown", "none", "null", "nan", "-1"}
+    if metadata.patient_id.str.lower().isin(placeholders).any():
+        raise ValueError("Genuine patient IDs are required for leakage checks.")
+    if not set(metadata.label).issubset(CLASSES):
+        raise ValueError(f"Unknown labels; use exactly {CLASSES}.")
+    if not set(metadata.original_partition).issubset({"train", "test"}):
+        raise ValueError("original_partition must contain only train or test.")
+    return metadata.reset_index(drop=True)
+
+
+def _inspect_image(path):
+    """Decode one image once and return dimensions plus duplicate signatures."""
+    with Image.open(path) as image:
+        image.load()
+        image_format = image.format or "unknown"
+        image_mode = image.mode
+        image = ImageOps.exif_transpose(image)
+        width, height = image.size
+        rgb = image.convert("RGB")
+        digest = hashlib.sha256(str(rgb.size).encode("ascii"))
+        digest.update(rgb.tobytes())
+        gray = rgb.convert("L")
+        pixels = np.asarray(
+            gray.resize((32, 32), Image.Resampling.LANCZOS), dtype=np.float64
+        )
+        positions = np.arange(32) + 0.5
+        basis = np.cos(np.pi / 32 * np.outer(np.arange(8), positions)) * np.sqrt(2 / 32)
+        basis[0] /= np.sqrt(2)
+        low = (basis @ pixels @ basis.T).ravel()
+        bits = low > np.median(low[1:])
+        bits[0] = False
+    return {
+        "width": width,
+        "height": height,
+        "image_mode": image_mode,
+        "image_format": image_format,
+        "sha256": digest.hexdigest(),
+        "perceptual_hash": np.packbits(bits).tobytes().hex(),
+    }
+
+
+def _count_duplicate_groups(frame, column):
+    values = frame.loc[frame[column].astype(str).ne(""), column]
+    counts = values.value_counts()
+    repeated = counts[counts.gt(1)]
+    return int(len(repeated)), int(repeated.sum())
+
+
+def audit_metadata(frame, data_dir=None):
+    """Inspect metadata and locally accessible images without creating data splits.
+
+    The returned table contains one row for every upstream metadata record, even
+    when its image is missing, unsupported, or corrupt. Counts in the report keep
+    upstream records separate from files that were actually decoded locally.
+    """
+    metadata = normalize_metadata(frame)
+    root = Path(data_dir).expanduser().resolve() if data_dir else None
+    records = []
+    for row in metadata.to_dict("records"):
+        source_path = Path(row["image_path"]).expanduser()
+        resolved = source_path.resolve() if source_path.is_absolute() else (
+            (root / source_path).resolve() if root else source_path.resolve()
+        )
+        result = {
+            **row,
+            "resolved_path": str(resolved),
+            "file_exists": False,
+            "supported_format": source_path.suffix.lower() in EXTENSIONS,
+            "readable": False,
+            "width": pd.NA,
+            "height": pd.NA,
+            "image_mode": "",
+            "image_format": "",
+            "sha256": "",
+            "perceptual_hash": "",
+            "validation_status": "missing",
+            "validation_message": "Image file does not exist.",
+        }
+        if row.get("resolution_status") == "ambiguous":
+            result.update(
+                validation_status="ambiguous",
+                validation_message=(
+                    "Multiple local files have this upstream filename; "
+                    "no image was selected."
+                ),
+            )
+        elif root and not resolved.is_relative_to(root):
+            result.update(
+                validation_status="invalid_path",
+                validation_message="Relative image path leaves the configured data directory.",
+            )
+        elif not resolved.is_file():
+            pass
+        elif not result["supported_format"]:
+            result.update(
+                file_exists=True,
+                validation_status="unsupported",
+                validation_message=f"Unsupported extension: {resolved.suffix or '(none)'}.",
+            )
+        else:
+            result["file_exists"] = True
+            try:
+                result.update(_inspect_image(resolved))
+                result.update(
+                    readable=True,
+                    validation_status="valid",
+                    validation_message="",
+                )
+            except (OSError, UnidentifiedImageError, ValueError, SyntaxError) as error:
+                result.update(
+                    validation_status="corrupt",
+                    validation_message=f"{type(error).__name__}: image could not be decoded.",
+                )
+        records.append(result)
+
+    audited = pd.DataFrame(records)
+    exact_groups, exact_records = _count_duplicate_groups(audited, "sha256")
+    perceptual_groups, perceptual_records = _count_duplicate_groups(
+        audited, "perceptual_hash"
+    )
+    patient_partitions = audited.groupby("patient_id").original_partition.nunique()
+    overlapping_patients = sorted(patient_partitions[patient_partitions.gt(1)].index.tolist())
+    path_label_counts = audited.groupby("image_path").label.nunique()
+    content_label_counts = (
+        audited[audited.sha256.ne("")].groupby("sha256").label.nunique()
+    )
+    status_counts = audited.validation_status.value_counts()
+    accessible = audited[audited.file_exists]
+    valid = audited[audited.readable]
+
+    def class_counts(mask):
+        return {
+            label: int((mask & audited.label.eq(label)).sum()) for label in CLASSES
+        }
+
+    warnings = []
+    if int(status_counts.get("missing", 0)):
+        warnings.append("Some metadata records do not have an accessible local image.")
+    if int(status_counts.get("corrupt", 0)):
+        warnings.append("Some image files could not be decoded by Pillow.")
+    if int(status_counts.get("unsupported", 0)):
+        warnings.append("Some files use unsupported image extensions.")
+    if int(status_counts.get("ambiguous", 0)):
+        warnings.append("Some upstream filenames match multiple local image files.")
+    if int(status_counts.get("invalid_path", 0)):
+        warnings.append("Some image paths leave the configured data directory.")
+    if overlapping_patients:
+        warnings.append("Patient IDs overlap the official train/test boundary.")
+    if int(path_label_counts.gt(1).sum()) or int(content_label_counts.gt(1).sum()):
+        warnings.append("Conflicting labels were found for an image path or exact image content.")
+    if perceptual_groups:
+        warnings.append(
+            "Matching perceptual hashes require review; they are duplicate candidates, not proof."
+        )
+    if exact_groups:
+        warnings.append("Exact decoded-image duplicate groups require leakage review.")
+    report = {
+        "metadata_records": int(len(audited)),
+        "unique_metadata_records": int(
+            len(audited.drop_duplicates(list(METADATA_REQUIRED)))
+        ),
+        "records_with_accessible_images": int(audited.file_exists.sum()),
+        "accessible_image_files": int(accessible.resolved_path.nunique()),
+        "valid_image_records": int(audited.readable.sum()),
+        "valid_images": int(valid.resolved_path.nunique()),
+        "missing_files": int(status_counts.get("missing", 0)),
+        "invalid_paths": int(status_counts.get("invalid_path", 0)),
+        "ambiguous_records": int(status_counts.get("ambiguous", 0)),
+        "unsupported_files": int(status_counts.get("unsupported", 0)),
+        "corrupt_files": int(status_counts.get("corrupt", 0)),
+        "duplicate_metadata_records": int(
+            audited.duplicated(list(METADATA_REQUIRED), keep=False).sum()
+        ),
+        "duplicate_image_path_records": int(
+            audited.duplicated("image_path", keep=False).sum()
+        ),
+        "exact_duplicate_groups": exact_groups,
+        "exact_duplicate_records": exact_records,
+        "perceptual_match_groups": perceptual_groups,
+        "perceptual_match_records": perceptual_records,
+        "patient_overlap_count": len(overlapping_patients),
+        "patient_overlap_ids_sample": overlapping_patients[:20],
+        "image_path_label_conflicts": int(path_label_counts.gt(1).sum()),
+        "exact_content_label_conflicts": int(content_label_counts.gt(1).sum()),
+        "class_metadata_records": class_counts(pd.Series(True, index=audited.index)),
+        "class_accessible_files": class_counts(audited.file_exists),
+        "class_valid_images": class_counts(audited.readable),
+        "partition_metadata_records": {
+            key: int(value)
+            for key, value in audited.original_partition.value_counts().to_dict().items()
+        },
+        "warnings": warnings,
+    }
+    return audited, report
+
+
+def audit_metadata_file(metadata_path, data_dir, output, report_path):
+    """Audit one metadata CSV and persist portable local observations."""
+    metadata_path = Path(metadata_path).expanduser().resolve()
+    frame = pd.read_csv(metadata_path, dtype=str, keep_default_na=False)
+    audited, report = audit_metadata(frame, data_dir)
+    output = Path(output).expanduser().resolve()
+    report_path = Path(report_path).expanduser().resolve()
+    output.parent.mkdir(parents=True, exist_ok=True)
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    audited.to_csv(output, index=False)
+    report_path.write_text(json.dumps(report, indent=2, allow_nan=False))
+    return audited, report
 
 
 def _check_rows(frame, check_files=True):
@@ -240,6 +466,8 @@ def index_images(data_dir, patients, output):
     """Create an index only from an explicit path/patient/source/label mapping."""
     data_dir, output = Path(data_dir).resolve(), Path(output).resolve()
     meta = pd.read_csv(patients, dtype=str, keep_default_na=False)
+    if "path" not in meta and "image_path" in meta:
+        meta = meta.rename(columns={"image_path": "path"})
     required = {"path", "label", "patient_id", "source"}
     if not required.issubset(meta):
         raise ValueError(f"Patient CSV requires {sorted(required)}.")
@@ -274,10 +502,24 @@ def main():
     split.add_argument("--output", default="data/processed/manifest.csv")
     split.add_argument("--seed", type=int, default=SEED)
     split.add_argument("--val-size", type=float, default=0.15)
+    audit = commands.add_parser(
+        "audit", help="Validate metadata and accessible images without creating splits"
+    )
+    audit.add_argument("--metadata", required=True)
+    audit.add_argument("--data-dir", required=True)
+    audit.add_argument("--output", default="data/processed/validated_metadata.csv")
+    audit.add_argument(
+        "--report", default="artifacts/results/eda/data_quality_report.json"
+    )
     args = parser.parse_args()
     if args.command == "index":
         frame = index_images(args.data_dir, args.patients, args.output)
-    else:
+        result = {
+            "rows": len(frame),
+            "output": args.output,
+            "class_counts": frame.label.value_counts().to_dict(),
+        }
+    elif args.command == "split":
         path = Path(args.index).resolve()
         frame = pd.read_csv(path, dtype=str, keep_default_na=False)
         frame["path"] = frame.path.map(lambda p: str((path.parent / p).resolve()))
@@ -286,7 +528,17 @@ def main():
         output.parent.mkdir(parents=True, exist_ok=True)
         frame["path"] = frame.path.map(lambda p: os.path.relpath(p, output.parent))
         frame.to_csv(output, index=False)
-    print(json.dumps({"rows": len(frame), "output": args.output, "class_counts": frame.label.value_counts().to_dict()}, indent=2))
+        result = {
+            "rows": len(frame),
+            "output": args.output,
+            "class_counts": frame.label.value_counts().to_dict(),
+        }
+    else:
+        _, report = audit_metadata_file(
+            args.metadata, args.data_dir, args.output, args.report
+        )
+        result = {**report, "output": args.output, "report": args.report}
+    print(json.dumps(result, indent=2))
 
 
 if __name__ == "__main__":

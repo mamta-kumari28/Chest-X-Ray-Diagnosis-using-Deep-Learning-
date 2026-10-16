@@ -119,21 +119,101 @@ The metadata importer intentionally does not claim to grant or check image right
      --output data/processed/patients.csv
    ```
 
-   The importer rejects missing images, duplicate filenames, changed labels,
-   missing IDs, source ID collisions, and official train/test patient overlap.
-   It writes paths relative to `--data-dir` and never overwrites an existing CSV.
-   It does not infer a patient ID from an image name or create placeholder IDs.
-6. After required source exclusions/permissions, build and split the image index:
+   The importer rejects changed labels, missing IDs, source ID collisions, and
+   upstream patient overlap. It records found, missing, and ambiguous local path
+   resolution separately and never overwrites an existing CSV. It does not infer
+   a patient ID from an image name or create placeholder IDs. Add
+   `--require-all-images` only when a strict complete-archive check is intended.
+6. Audit local files and generate Phase 2 EDA without creating final splits:
 
    ```bash
-   python -m covid_xray.data index --data-dir data/raw/covidx \
-     --patients data/processed/patients.csv --output data/processed/index.csv
-   python -m covid_xray.data split --index data/processed/index.csv \
-     --output data/processed/manifest.csv --val-size 0.15
+   python -m covid_xray.data audit \
+     --metadata data/processed/patients.csv \
+     --data-dir data/raw/covidx \
+     --output data/processed/validated_metadata.csv \
+     --report artifacts/results/eda/data_quality_report.json
+
+   python -m covid_xray.eda \
+     --metadata data/processed/patients.csv \
+     --data-dir data/raw/covidx \
+     --validated-output data/processed/validated_metadata.csv \
+     --output artifacts/results/eda
    ```
 
-   Install the project as described in the main README before these module
-   commands. See the Colab notebook for GPU training and local EDA commands.
+   Install the project as described in the main README before these commands.
+   The audit keeps every metadata record while separately marking valid, missing,
+   corrupt, unsupported, and unsafe paths. Phase 3 owns final train/validation
+   construction; do not alter the official test partition in Phase 2.
+
+### Google Colab with Google Drive
+
+Use a Drive folder for the large archive and generated reports so a Colab
+runtime restart does not remove them. After accepting the applicable dataset
+terms, upload the downloaded version-7 archive to Drive or download it there
+with Kaggle credentials stored in **Colab Secrets**. Never put credentials in a
+code cell.
+
+Run these cells in a fresh Colab runtime:
+
+```python
+from google.colab import drive
+
+drive.mount("/content/drive")
+```
+
+```bash
+%cd /content
+!git clone https://github.com/mamta-kumari28/Chest-X-Ray-Diagnosis-using-Deep-Learning-.git
+%cd /content/Chest-X-Ray-Diagnosis-using-Deep-Learning-
+!python -m pip install -r requirements-colab.txt
+!python -m pip install -e . --no-deps
+```
+
+Set paths to the extracted archive and the two pinned label files. Both the
+local repository layout and a mounted Drive layout are supported:
+
+```python
+import os
+
+os.environ["COVIDX_DATA_DIR"] = "/content/drive/MyDrive/covidx-cxr3a-v7/images"
+os.environ["COVIDX_LABEL_DIR"] = "/content/drive/MyDrive/covidx-cxr3a-v7/labels"
+os.environ["COVIDX_METADATA"] = "/content/drive/MyDrive/covidx-cxr3a-v7/processed/patients.csv"
+```
+
+If the account is authorized for the release, an optional Kaggle download can
+use secrets without displaying their values:
+
+```python
+import os
+from google.colab import userdata
+
+os.environ["KAGGLE_USERNAME"] = userdata.get("KAGGLE_USERNAME")
+os.environ["KAGGLE_KEY"] = userdata.get("KAGGLE_KEY")
+```
+
+```bash
+!python -m pip install kaggle
+!mkdir -p "/content/drive/MyDrive/covidx-cxr3a-v7/images"
+!kaggle datasets download andyczhao/covidx-cxr2/7 \
+  --path "/content/drive/MyDrive/covidx-cxr3a-v7/images" --unzip
+```
+
+Then open and run `notebooks/02_preprocessing.ipynb`, followed by
+`notebooks/01_data_exploration.ipynb`. The importer searches nested train/test
+folders, so the extracted archive does not need to be flattened. The notebooks
+stop with a clear error when labels, metadata, or the configured image root are
+absent; they do not claim a download succeeded merely because a command ran.
+
+### Expected Phase 2 outputs
+
+With readable local images, `artifacts/results/eda/` receives
+`class_distribution.png`, `sample_images.png`, `image_dimensions.png`,
+`dataset_summary.csv`, and `data_quality_report.json`. The plot, CSV, and JSON
+describe the imported metadata and validation status. Record counts with an
+accessible image are kept separate from unique accessible file counts. Image samples and
+dimension plots are written only when real images decode successfully; the code
+does not create placeholders. Generated outputs and medical data remain ignored
+by Git.
 
 All downloaded data, generated patient metadata, and model outputs belong in
 ignored directories. A legitimate download still does not authorize publishing
@@ -150,11 +230,12 @@ patient_id image_filename benchmark_label source_dataset
 `scripts/import_covidx_metadata.py` produces:
 
 ```text
-path,patient_id,source,label,original_split
+image_path,label,patient_id,original_partition,source,resolution_status,candidate_count
 ```
 
-`path` is relative to the extracted image root; canonical labels are `COVID-19`,
-`Normal`, and `Pneumonia`. `original_split` is `train` or `test`. Raw upstream
+`image_path` is relative to the extracted image root when exactly one local file
+is found; canonical labels are `COVID-19`, `Normal`, and `Pneumonia`.
+`original_partition` is `train` or `test`. Raw upstream
 patient IDs remain consistent across images; the inspected release contains no
 ID shared between different source tokens and no train/test patient overlap.
 Patient IDs are taken from the authors' metadata, not independently clinically

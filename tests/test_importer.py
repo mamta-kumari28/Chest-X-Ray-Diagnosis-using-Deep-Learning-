@@ -67,3 +67,18 @@ def test_importer_resolves_one_nested_file_without_changing_patient_metadata(imp
 
     assert result == [{**original, "path": "train/example.png"}]
     assert original["path"] == "example.png"
+
+
+def test_phase2_mapping_retains_missing_records_for_quality_reporting(importer, tmp_path):
+    found = tmp_path / "train" / "found.png"
+    found.parent.mkdir()
+    Image.new("L", (16, 20)).save(found)
+    rows = [_row("found.png"), {**_row("missing.png"), "patient_id": "p2"}]
+
+    result = importer.map_image_paths(rows, tmp_path)
+
+    assert result[0]["image_path"] == "train/found.png"
+    assert result[0]["resolution_status"] == "found"
+    assert result[1]["image_path"] == "missing.png"
+    assert result[1]["resolution_status"] == "missing"
+    assert result[1]["candidate_count"] == 0

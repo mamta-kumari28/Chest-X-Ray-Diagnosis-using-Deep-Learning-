@@ -1,18 +1,122 @@
 """Save descriptive tables and figures from an actual validated image manifest."""
 
 import argparse
+import json
 from pathlib import Path
 
 import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
 from PIL import Image, ImageOps
 
 from covid_xray.config import CLASSES
-from covid_xray.data import load_manifest
+from covid_xray.data import audit_metadata_file, load_manifest
+
+
+def create_dataset_report(frame, quality_report, output):
+    """Save Phase 2 EDA from images that were actually decoded locally."""
+    output = Path(output)
+    output.mkdir(parents=True, exist_ok=True)
+    sns.set_theme(style="whitegrid")
+    audited = frame.copy()
+    audited["file_exists"] = audited.file_exists.astype(bool)
+    audited["readable"] = audited.readable.astype(bool)
+
+    summary = (
+        audited.groupby(["original_partition", "label"], dropna=False)
+        .agg(
+            metadata_records=("image_path", "size"),
+            records_with_accessible_images=("file_exists", "sum"),
+            valid_image_records=("readable", "sum"),
+            unique_patients=("patient_id", "nunique"),
+        )
+        .reset_index()
+    )
+    summary.to_csv(output / "dataset_summary.csv", index=False)
+    (output / "data_quality_report.json").write_text(
+        json.dumps(quality_report, indent=2, allow_nan=False)
+    )
+
+    class_summary = (
+        audited.groupby("label")
+        .agg(
+            metadata_records=("image_path", "size"),
+            valid_image_records=("readable", "sum"),
+        )
+        .reindex(CLASSES, fill_value=0)
+        .reset_index()
+    )
+    plot_data = class_summary.melt(
+        id_vars="label", var_name="observation", value_name="count"
+    )
+    fig, axis = plt.subplots(figsize=(8, 5))
+    sns.barplot(
+        data=plot_data,
+        x="label",
+        y="count",
+        hue="observation",
+        order=CLASSES,
+        ax=axis,
+    )
+    axis.set(
+        title="Upstream metadata records vs locally validated images",
+        xlabel="Class",
+        ylabel="Count",
+    )
+    fig.tight_layout()
+    fig.savefig(output / "class_distribution.png", dpi=160)
+    plt.close(fig)
+
+    valid = audited[audited.readable].copy()
+    if not valid.empty:
+        # Display only locally decoded images; no placeholder pixels are generated.
+        fig, axes = plt.subplots(len(CLASSES), 3, figsize=(9, 9), squeeze=False)
+        for row_number, label in enumerate(CLASSES):
+            examples = valid[valid.label.eq(label)].sample(frac=1, random_state=42).head(3)
+            for column_number, axis in enumerate(axes[row_number]):
+                axis.axis("off")
+                if column_number < len(examples):
+                    example = examples.iloc[column_number]
+                    with Image.open(example.resolved_path) as image:
+                        axis.imshow(ImageOps.exif_transpose(image).convert("L"), cmap="gray")
+                    axis.set_title(f"{label} — local validated sample")
+        fig.tight_layout()
+        fig.savefig(output / "sample_images.png", dpi=140)
+        plt.close(fig)
+
+        dimensions = valid[["label", "width", "height"]].copy()
+        dimensions[["width", "height"]] = dimensions[["width", "height"]].astype(int)
+        fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+        sns.scatterplot(
+            data=dimensions,
+            x="width",
+            y="height",
+            hue="label",
+            hue_order=CLASSES,
+            alpha=0.6,
+            ax=axes[0],
+        )
+        axes[0].set_title("Original image dimensions")
+        pixel_counts = np.log10(dimensions.width * dimensions.height)
+        sns.histplot(pixel_counts, bins=25, ax=axes[1])
+        axes[1].set(
+            title="Image-area distribution",
+            xlabel="log10(width × height)",
+            ylabel="Images",
+        )
+        fig.tight_layout()
+        fig.savefig(output / "image_dimensions.png", dpi=160)
+        plt.close(fig)
+    print(
+        f"Saved Phase 2 EDA to {output}. "
+        f"Validated {quality_report['valid_images']} of "
+        f"{quality_report['metadata_records']} metadata records locally."
+    )
+    return summary
 
 
 def create_report(manifest, output):
@@ -78,10 +182,28 @@ def create_report(manifest, output):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--manifest", required=True)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--manifest")
+    source.add_argument("--metadata")
+    parser.add_argument("--data-dir")
+    parser.add_argument(
+        "--validated-output", default="data/processed/validated_metadata.csv"
+    )
     parser.add_argument("--output", default="artifacts/results/eda")
     args = parser.parse_args()
-    create_report(args.manifest, args.output)
+    if args.metadata:
+        if not args.data_dir:
+            parser.error("--data-dir is required with --metadata")
+        report_path = Path(args.output) / "data_quality_report.json"
+        frame, report = audit_metadata_file(
+            args.metadata,
+            args.data_dir,
+            args.validated_output,
+            report_path,
+        )
+        create_dataset_report(frame, report, args.output)
+    else:
+        create_report(args.manifest, args.output)
 
 
 if __name__ == "__main__":

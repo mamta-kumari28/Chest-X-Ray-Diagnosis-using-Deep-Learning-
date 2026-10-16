@@ -24,7 +24,7 @@ from covid_xray.config import CLASSES, IMAGE_SIZE
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_IMAGE_PIXELS = 25_000_000
-DEFAULT_MODEL_PATH = Path(__file__).resolve().parents[2] / "artifacts" / "model.keras"
+DEFAULT_MODEL_PATH = Path(__file__).resolve().parents[2] / "artifacts" / "models" / "model.keras"
 
 
 class ImageValidationError(ValueError):

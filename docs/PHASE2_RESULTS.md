@@ -50,6 +50,13 @@ and dimensions; it found **8 groups covering 17 records**. The 64-bit perceptual
 hash produced **242 matching groups covering 581 records**. A perceptual-hash
 match is a review candidate and does not prove that two images are duplicates.
 
+These are the previously observed aggregate results. The original report did not
+record whether any exact or perceptual group crossed the official train/test
+boundary. The new reproducible private-review workflow must be executed against
+`validated_metadata.csv` to answer that question. No human decisions have been
+supplied, so all 242 perceptual groups remain **unresolved**. This repository does
+not claim that duplicate review is complete.
+
 ## Phase 3 gate
 
 Before creating a train/validation split or training a model:
@@ -63,6 +70,11 @@ Before creating a train/validation split or training a model:
    the official training pool to the held-out test set.
 4. Record any source exclusions required by image-use terms and rerun this audit
    on the resulting modified cohort before training.
+
+The final validation code now enforces these gates, but it was not independently
+run against the private 30,034-row validated metadata in the development
+environment. Follow `docs/PHASE2_FINAL_CHECKLIST.md` in the authorized Colab
+runtime and retain its private review artifacts outside Git.
 
 Generated reports and plots stay under ignored output directories. The aggregate
 JSON/CSV supplied for this review contained no image paths or patient IDs. The

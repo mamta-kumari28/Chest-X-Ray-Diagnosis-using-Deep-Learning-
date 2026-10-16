@@ -1,0 +1,9 @@
+# CPU TensorFlow runs the web app and local checks. Colab installs its GPU package separately.
+tensorflow-cpu==2.18.1
+numpy==2.0.2
+pandas==2.2.3
+matplotlib==3.10.1
+seaborn==0.13.2
+scikit-learn==1.6.1
+Pillow==11.1.0
+streamlit==1.43.2

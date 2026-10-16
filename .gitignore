@@ -1,0 +1,28 @@
+# Local environments, credentials, caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+.env
+.env.*
+.streamlit/secrets.toml
+kaggle.json
+*credentials*.json
+# Never upload patient metadata, images, trained weights, or generated outputs.
+data/**
+!data/README.md
+artifacts/**
+!artifacts/README.md
+*.keras
+*.h5
+*.hdf5
+*.ckpt*
+*.tfrecord*
+*.zip
+*.tar
+*.tar.gz
+logs/

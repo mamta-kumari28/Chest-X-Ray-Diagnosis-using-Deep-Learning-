@@ -1,6 +1,6 @@
 # Chest X-Ray Diagnosis using Deep Learning
 
-[![Python Tests](https://github.com/umang-kumar03/Chest-X-Ray-Diagnosis-using-Deep-Learning-/actions/workflows/tests.yml/badge.svg)](https://github.com/umang-kumar03/Chest-X-Ray-Diagnosis-using-Deep-Learning-/actions/workflows/tests.yml)
+[![Python Tests](https://github.com/mamta-kumari28/Chest-X-Ray-Diagnosis-using-Deep-Learning-/actions/workflows/tests.yml/badge.svg)](https://github.com/mamta-kumari28/Chest-X-Ray-Diagnosis-using-Deep-Learning-/actions/workflows/tests.yml)
 
 [Open Live Showcase](https://umang-chest-xray-showcase.streamlit.app/)
 

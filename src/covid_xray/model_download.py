@@ -10,7 +10,7 @@ from covid_xray.config import MODEL_SHA256
 
 
 MODEL_URL = (
-    "https://github.com/umang-kumar03/"
+    "https://github.com/mamta-kumari28/"
     "Chest-X-Ray-Diagnosis-using-Deep-Learning-/"
     "releases/download/model-v1/best_model.keras"
 )

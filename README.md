@@ -2,7 +2,7 @@
 
 [![Python Tests](https://github.com/mamta-kumari28/Chest-X-Ray-Diagnosis-using-Deep-Learning-/actions/workflows/tests.yml/badge.svg)](https://github.com/mamta-kumari28/Chest-X-Ray-Diagnosis-using-Deep-Learning-/actions/workflows/tests.yml)
 
-[Open Live Showcase](https://umang-chest-xray-showcase.streamlit.app/)
+[Open Live Showcase](https://mamta-chest-xray.streamlit.app/)
 
 The public application supports image upload and classification
 and displays recorded evaluation results.

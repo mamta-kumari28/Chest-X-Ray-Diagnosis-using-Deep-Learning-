@@ -1,0 +1,8 @@
+{
+  "evaluation_split": "validation",
+  "comparison_type": "exploratory_single_seed",
+  "baseline_false_negatives": 111,
+  "original_false_negatives": 375,
+  "relative_fn_reduction_percent": -237.83783783783784,
+  "seconds": 748.49
+}

@@ -1,0 +1,3 @@
+split,images,batches,positive,seconds
+train,23873,747,12685,331.24
+validation,6103,191,3300,94.8

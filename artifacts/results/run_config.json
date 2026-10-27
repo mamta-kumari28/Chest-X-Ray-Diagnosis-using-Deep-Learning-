@@ -1,0 +1,27 @@
+{
+  "tensorflow_version": "2.20.0",
+  "seed": 42,
+  "max_epochs": 30,
+  "batch_size": 32,
+  "image_shape": [
+    224,
+    224,
+    1
+  ],
+  "training_images": 23873,
+  "validation_images": 6103,
+  "class_mapping": {
+    "negative": 0,
+    "positive": 1
+  },
+  "class_weights": {
+    "0": 1.0669020378977476,
+    "1": 0.9409932991722507
+  },
+  "checkpoint_monitor": "val_loss",
+  "augmentation": {
+    "rotation_factor": 0.02,
+    "translation_height": 0.03,
+    "translation_width": 0.03
+  }
+}

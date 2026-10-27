@@ -1,50 +1,41 @@
-# Local environments, credentials, caches
+# Python environment
 .venv/
 venv/
+
+# Python cache
 __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
-.ruff_cache/
-.ipynb_checkpoints/
+
+# Secrets
 .env
 .env.*
+!.env.example
 .streamlit/secrets.toml
 kaggle.json
-*credentials*.json
-duplicate_review*.csv
-duplicate_decisions*.csv
-reviewed_duplicates*.csv
-contact_sheets/
-# Never upload patient metadata, images, trained weights, or generated outputs.
-data/*
-!data/README.md
-!data/raw/
-!data/processed/
+
+# Local datasets
 data/raw/*
-!data/raw/README.md
+!data/raw/.gitkeep
 data/processed/*
-!data/processed/README.md
-artifacts/*
-!artifacts/README.md
-!artifacts/models/
-!artifacts/results/
+!data/processed/.gitkeep
+
+# Trained models
 artifacts/models/*
-!artifacts/models/README.md
-artifacts/results/*
-!artifacts/results/README.md
-sample_images/*
-!sample_images/README.md
+!artifacts/models/.gitkeep
 *.keras
 *.h5
 *.hdf5
-*.ckpt*
-*.tfrecord*
-*.dcm
-*.dicom
-*.nii
-*.nii.gz
-*.zip
-*.tar
-*.tar.gz
-logs/
+
+# Notebook temporary files
+.ipynb_checkpoints/
+
+# Editor and system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+# Packaging outputs
+build/
+dist/

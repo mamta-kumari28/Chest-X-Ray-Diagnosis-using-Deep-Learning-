@@ -1,0 +1,14 @@
+{
+  "images": 400,
+  "threshold": 0.5,
+  "accuracy": 0.785,
+  "precision": 0.88,
+  "recall": 0.66,
+  "f1": 0.7542857142857143,
+  "roc_auc": 0.9055,
+  "log_loss": 0.48621377020169687,
+  "true_negative": 182,
+  "false_positive": 18,
+  "false_negative": 68,
+  "true_positive": 132
+}

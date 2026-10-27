@@ -1,1 +1,1 @@
-"""Experimental chest X-ray classification; no trained model is bundled."""
+"""COVID-19 chest X-ray classification package."""

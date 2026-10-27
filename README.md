@@ -1,153 +1,166 @@
-# COVID-19 Chest X-Ray Detection using Deep Learning
+# Chest X-Ray Diagnosis using Deep Learning
 
-[![Open training notebook in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mamta-kumari28/Chest-X-Ray-Diagnosis-using-Deep-Learning-/blob/main/notebooks/train_colab.ipynb)
+[![Python Tests](https://github.com/umang-kumar03/Chest-X-Ray-Diagnosis-using-Deep-Learning-/actions/workflows/tests.yml/badge.svg)](https://github.com/umang-kumar03/Chest-X-Ray-Diagnosis-using-Deep-Learning-/actions/workflows/tests.yml)
 
-For the remaining account-owned actions, use the short [completion checklist](docs/NEXT_STEPS.md).
+[Open Live Showcase](https://umang-chest-xray-showcase.streamlit.app/)
 
-A reproducible, three-class image-classification project with a custom TensorFlow/Keras CNN, patient-aware data preparation, exploratory analysis, held-out evaluation, and a Streamlit interface.
+The public application supports image upload and classification
+and displays recorded evaluation results.
 
-**Project status:** implementation and local functional checks are available. No real chest X-ray dataset has been downloaded in this workspace, no clinical model has been trained, and no medical performance numbers or live deployment are claimed. The app opens without a model and keeps predictions disabled until a verified trained artifact bundle is installed.
+An educational project for COVID-19 classification from chest
+X-ray images using a custom TensorFlow/Keras CNN and Streamlit.
 
-> Educational and experimental use only. Predictions are not medical diagnoses. A Normal prediction cannot rule out illness. Use only de-identified images you are permitted to process.
+## Project Status
 
-## Dataset and scope
+- Dataset audit and patient-group split completed.
+- Shared preprocessing and batch loading verified.
+- Custom CNN trained with early stopping.
+- Saved best checkpoint validated and official test evaluated.
+- Streamlit application tested locally with image upload,
+  prediction, and saved evaluation results.
+- Public Streamlit application deployed with image upload,
+  checksum-verified checkpoint download, and interactive inference.
 
-The recommended dataset is **COVIDx CXR-3A**, with **30,034 chest X-rays** across COVID-19, Normal, and Pneumonia, documented by the COVID-Net authors. Its version-specific metadata supplies patient IDs, filenames, labels, sources, and official train/test assignments. This project uses three mutually exclusive dataset labels; real COVID-19 can itself cause pneumonia, so these labels are not a complete clinical differential diagnosis.
+## Dataset
 
-| Class | Official training pool | Official test | Total |
+Source: [COVIDx on Kaggle](https://www.kaggle.com/datasets/andyczhao/covidx-cxr2)
+
+Selected release: Kaggle Version 7.
+
+Verified counts from the attached label files:
+
+| Official split | Negative | Positive | Total |
 | --- | ---: | ---: | ---: |
-| COVID-19 | 15,994 | 200 | 16,194 |
-| Normal | 8,085 | 100 | 8,185 |
-| Pneumonia | 5,555 | 100 | 5,655 |
-| Total | 29,634 | 400 | 30,034 |
+| Train | 13,992 | 15,994 | 29,986 |
+| Test | 200 | 200 | 400 |
+| Total | 14,192 | 16,194 | 30,386 |
 
-Read [the dataset guide](docs/DATASET.md) before downloading. It records verified author documentation, exact release links, metadata checksums, download instructions, and source-specific licenses. Dataset access and all image-reuse permissions remain your responsibility. COVID-Net's software license does **not** license its component images. Some source images restrict nonacademic use and redistribution; never publish generated sample-image figures without permission.
+A patient-group validation subset was created from the deduplicated
+official training split. The official test split was used for final
+evaluation.
 
-## Project structure
+### Initial Checks
+
+- All 30,386 labeled images were successfully decoded.
+- Nine exact-file duplicate groups were found in the official
+  training split. Ten redundant copies were excluded from derived
+  manifests; original files were preserved.
+- The deduplicated training pool contains 29,976 images:
+  23,873 training and 6,103 validation images.
+- Training and validation share no constructed patient groups
+  or exact-file hashes.
+- No byte-identical files were shared between official train and test.
+- Near duplicates and unidentified patient relationships remain
+  possible; these checks do not establish complete absence of leakage.
+
+## Dataset Exploration
+
+![Class distribution](artifacts/results/class_distribution.png)
+
+[View dataset summary](artifacts/results/dataset_summary.csv)
+
+## Tools
+
+Python, TensorFlow/Keras, NumPy, pandas, OpenCV, scikit-learn,
+Matplotlib, Seaborn, and Streamlit.
+
+Development is performed in VS Code. Model training was completed
+on a Kaggle Tesla T4 GPU.
+
+## Training Curves
+
+![Training and validation accuracy](artifacts/results/accuracy_curve.png)
+
+![Training and validation loss](artifacts/results/loss_curve.png)
+
+The checkpoint was selected by minimum validation loss at epoch 4.
+Early stopping ended training after 9 epochs.
+
+[Recorded training history](artifacts/results/training_history.csv)
+
+
+## Results
+
+A custom CNN was trained using TensorFlow/Keras with training-only
+augmentation and class weights. Early stopping ended training after
+9 epochs. The checkpoint with the lowest validation loss was selected
+at epoch 4.
+
+The classification threshold was fixed at 0.5 before test evaluation.
+
+| Metric | Validation | Official test |
+| --- | ---: | ---: |
+| Images | 6,103 | 400 |
+| Accuracy | 89.91% | 78.50% |
+| Positive-class precision | 92.39% | 88.00% |
+| Positive-class recall | 88.64% | 66.00% |
+| Positive-class F1 | 90.47% | 75.43% |
+| ROC-AUC | 0.9572 | 0.9055 |
+
+### Official Test Confusion Matrix
+
+![Test confusion matrix](artifacts/results/test_confusion_matrix.png)
+
+Of 200 COVID-positive test images, 132 were detected and 68 were
+missed. Of 200 negative images, 182 were correctly classified
+and 18 were classified as positive.
+
+The validation-to-test performance gap indicates limited
+generalization on this test split. Its cause has not been established.
+These results do not establish clinical suitability.
+
+An exploratory single-seed comparison on the validation split found
+that a baseline trained without augmentation or class weights
+outperformed the original model: 96.44% validation accuracy and
+111 false negatives, compared with 89.91% and 375 false negatives.
+
+This experiment does not support a false-negative reduction claim.
+It does not isolate the individual effects of augmentation and
+class weighting. Baseline official test performance is unknown.
+The application continues to use the original evaluated checkpoint.
+
+[Baseline comparison notebook](notebooks/05_baseline_comparison.ipynb)
+
+[Validation metrics](artifacts/results/best_validation_metrics.json) ·
+[Test metrics](artifacts/results/test_metrics.json) ·
+[Classification report](artifacts/results/test_classification_report.csv)
+
+## Application Preview
+
+![Streamlit application](artifacts/results/app_screenshot.png)
+
+
+## Run the Streamlit App
+
+Place the trained checkpoint at:
 
 ```text
-app.py                       Streamlit interface, no fallback predictions
-deploy_app.py                Optional release-download entry point for hosted Streamlit
-src/covid_xray/
-  config.py                  Shared class order and image size
-  data.py                    Indexing, hashing, group splitting, tf.data pipelines
-  eda.py                     Counts, training samples, image-dimension plots
-  model.py                   Custom CNN with saved preprocessing
-  train.py                   Callbacks, best checkpoint, provenance, learning curves
-  evaluate.py                Held-out metrics, ROC, confusion matrix, FP/FN analysis
-  inference.py               Upload checks, model integrity checks, predictions
-scripts/
-  import_covidx_metadata.py  Version-specific genuine patient metadata importer
-  download_model.py         Explicit HTTPS artifact download with checksum checks
-notebooks/
-  01_data_exploration.ipynb  Validated Phase 2 EDA through the package
-  02_preprocessing.ipynb     Metadata import and audit; no final split
-  03_cnn_training.ipynb      GPU training through covid_xray.train
-  04_model_evaluation.ipynb  Held-out evaluation through covid_xray.evaluate
-  train_colab.ipynb          Retained end-to-end Colab workflow
-tests/                       Data integrity, model, inference, app, evaluation tests
-docs/                        Dataset, deployment, and model-card documentation
-data/raw/                    Ignored local licensed medical data
-data/processed/              Ignored local indexes and manifests
-artifacts/models/            Ignored model checkpoints and training history
-artifacts/results/           Ignored EDA and evaluation reports
-sample_images/               Ignored licensed demo-image location
+artifacts/models/best_model.keras
 ```
 
-## Local setup
+Model weights are not included in this repository.
 
-Use **Python 3.11 or 3.12**; the tested runtime is Python 3.12 on Linux. From this repository:
+After installing the project dependencies and package, run
+this command from the project root:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements-dev.txt
-python -m pip install -e . --no-deps
-python -m pytest -q
-ruff check .
-streamlit run app.py
+python -m streamlit run app.py
 ```
 
-For serving alone, install `requirements.txt` instead of `requirements-dev.txt`. The CPU package is appropriate for local development and serving. Colab uses **`requirements-colab.txt`**, which installs GPU-capable TensorFlow instead; do not install both TensorFlow distributions in the same runtime. No API key is needed to run the local app. Kaggle may require an account or accepted dataset terms for downloads.
+The app accepts PNG/JPEG files up to 10 MB and displays a model
+score with a fixed classification threshold of 0.5.
 
-For the exact tested **Linux/Python 3.12 CPU development environment**, replace the first dependency-install command with `python -m pip install --require-hashes -r requirements-lock.txt`. This includes development tools and pins transitive dependencies with artifact hashes. CI and the cloud setup use this lock; the Colab requirements remain separate because they use the GPU distribution.
+It does not verify whether an uploaded image is a chest X-ray.
+Scores are not calibrated medical probabilities.
 
-## Prepare data and explore
+## Documentation
 
-1. Follow [docs/DATASET.md](docs/DATASET.md) to download the exact CXR-3A images and its two pinned label files. Keep downloaded images outside Git under `data/raw/covidx/`. The latest COVIDx release is not interchangeable with CXR-3A.
-2. Convert the official labels into metadata, audit local files, and generate EDA. Phase 2 preserves the official partitions and does not create final training splits:
+- [Dataset setup and audit](docs/DATASET.md)
+- [Model card and limitations](docs/MODEL_CARD.md)
+- [Application setup and deployment](docs/DEPLOYMENT.md)
 
-```bash
-python scripts/import_covidx_metadata.py \
-  --labels data/raw/train_COVIDx_CXR-3A.txt data/raw/test_COVIDx_CXR-3A.txt \
-  --data-dir data/raw/covidx --output data/processed/patients.csv
 
-python -m covid_xray.eda \
-  --metadata data/processed/patients.csv \
-  --data-dir data/raw/covidx \
-  --validated-output data/processed/validated_metadata.csv \
-  --output artifacts/results/eda
-```
+## Intended Use
 
-The Phase 2 metadata contains `image_path`, `label`, `patient_id`, `original_partition`, `source`, local resolution status, and candidate count. The audited CSV adds actual file availability, decode status, dimensions, exact pixel hashes, and perceptual hashes. Missing or ambiguous files remain visible for reporting. Custom data must supply genuine, consistently namespaced patient identifiers; filenames and row numbers are never accepted as inferred IDs.
-
-The official 400-record test partition is preserved exactly in Phase 2. Patient overlap, exact duplicates, perceptual-hash candidates, label conflicts, missing files, corrupt images, unsupported formats, and dimensions are reported without moving records. Phase 3 must review these findings before deriving a validation split from the official training pool. Run `python -m covid_xray.data duplicates --validated-metadata data/processed/validated_metadata.csv` to create the ignored private review CSV. Human decisions use `accepted`, `rejected`, or `unresolved`; perceptual matches are never accepted automatically.
-
-An authorized Google Colab run validated all **30,034** CXR-3A records against
-**30,034** readable local image files. It found no missing, corrupt, unsupported,
-ambiguous, or path-conflicting files; no conflicting labels; and no patient ID
-overlap across the official train/test boundary. It also found 8 exact decoded-image
-duplicate groups (17 records) and 242 matching perceptual-hash groups (581 records).
-Those groups remain Phase 3 review inputs rather than evidence of independent
-images. See [the verified Phase 2 results](docs/PHASE2_RESULTS.md).
-
-Exact duplicates are detected using decoded RGB pixel hashes, including duplicates whose file metadata differs, and always stay in one connected group. A 64-bit perceptual hash flags matching low-frequency signatures that may identify resized/recompressed copies. These matches remain candidates until human review; only accepted groups connect future train/validation records. Unresolved or accepted candidates crossing the official train/test boundary stop splitting, while rejected candidates remain documented without being linked. Loading a manifest recomputes hashes to detect altered images. These checks cannot recover missing patient identities or prove that different perceptual hashes represent unrelated images: manually audit suspicious source overlap, near-matching hashes, and transformed duplicates before making generalization claims. Source-specific preprocessing and hospital artifacts can also leak the label despite disjoint patients.
-
-When readable local images are available, EDA saves `class_distribution.png`, `sample_images.png`, `image_dimensions.png`, `dataset_summary.csv`, and `data_quality_report.json` under `artifacts/results/eda/`. Metadata-record counts and actually validated local-image counts are shown separately. No real-data plots are included in Git; sample previews remain local because source-image redistribution rights vary.
-
-For Google Colab, open `notebooks/02_preprocessing.ipynb`, optionally mount Drive, and set `COVIDX_DATA_DIR` and `COVIDX_LABEL_DIR` to the extracted version-7 images and pinned label-file folder. Then run `notebooks/01_data_exploration.ipynb` with the same `COVIDX_DATA_DIR`. Dataset-host login, acceptance of terms, and any private credentials remain manual account actions.
-
-## Train on a Colab GPU
-
-Use the focused notebooks in numeric order for portfolio review. The retained [end-to-end Colab notebook](notebooks/train_colab.ipynb) provides the same complete workflow in one place. Choose **Runtime → Change runtime type → GPU** for training and use Python 3.11/3.12. All notebooks call the existing `covid_xray` package rather than carrying separate implementations.
-
-The same commands run from a configured GPU checkout:
-
-```bash
-python -m covid_xray.train --manifest data/processed/manifest.csv \
-  --output artifacts/models --epochs 30 --batch-size 32
-
-python -m covid_xray.evaluate --manifest data/processed/manifest.csv \
-  --model artifacts/models/model.keras --output artifacts/results
-```
-
-The CNN includes Conv2D, BatchNormalization, MaxPooling2D, Dropout, global average pooling, and Dense layers. Images become RGB at **224 × 224**. The saved model normalizes pixels with `Rescaling(1/255)` and applies small rotation, translation, and zoom **only during training**. Training, validation, and serving use the same pixel-range contract. Class weights are computed on training data only. Bounded parallel `tf.data` workers, batching, and prefetching avoid caching the full dataset in memory.
-
-Training uses EarlyStopping, ModelCheckpoint, ReduceLROnPlateau, CSVLogger, and TerminateOnNaN. `model.keras` is the checkpoint with the lowest validation loss. The run also saves `history.json`, `training_curves.png`, `class_names.json`, and `model_metadata.json` with a checksum, class order, input contract, actual epoch counts, and manifest provenance. Existing models are protected unless `--overwrite` is explicit. Training and evaluation reject synthetic test fixtures as portfolio data. Fixed seeds improve repeatability; hardware/software differences can still affect results.
-
-## Evaluate and interpret
-
-The test set is used by the separate evaluation command after model selection. Keep its manifest unchanged: evaluation checks both the model checksum and the exact training-manifest checksum.
-
-Outputs include accuracy; macro/weighted precision, recall, and F1; a per-class classification report; confusion matrix; one-vs-rest and macro ROC-AUC where defined; ROC curves; per-image predictions; FP/FN counts and examples for every class; and a local grid of incorrect predictions. Undefined metrics are recorded with reasons rather than invented values. Scores are uncalibrated softmax outputs. Metrics describe images on held-out source-identified patients, not prospective clinical performance.
-
-Investigate false-negative COVID-19 cases and false positives separately, review source/hospital and acquisition confounding, inspect class imbalance, and document limitations in [the model card](docs/MODEL_CARD.md). Retuning after inspecting test results makes that set development data and requires a new independent test cohort.
-
-## Web app and deployment
-
-Run `streamlit run app.py` to preview the interface. Install the actual trained bundle into `artifacts/models/`, or configure `MODEL_PATH` to a `.keras` file with its JSON companions. The app verifies checksums and class order, checks actual image content and size, previews uploads, and plots all three class scores. It cannot determine whether an arbitrary valid image is a chest X-ray.
-
-For large files, publish a permitted, evaluated model bundle separately and use:
-
-```bash
-python scripts/download_model.py --base-url https://YOUR-HOST/VERSION \
-  --sha256 YOUR_TRUSTED_MODEL_SHA256 --output artifacts/models
-```
-
-The URL and checksum above are placeholders; no trained model download is presently published. [Deployment instructions](docs/DEPLOYMENT.md) cover Streamlit Community Cloud and container/VM hosting, optional explicit artifact provisioning, and manual deployment actions. No deployment is performed automatically by this repository.
-
-## Verification and remaining work
-
-Local tests use synthetic temporary fixtures to verify patient/hash isolation, deterministic preprocessing, real TensorFlow optimization and Keras save/load, upload handling, artifact verification, app startup, and metric/report logic. Fixture results are never presented as medical model results. GitHub Actions runs lint and tests on Python 3.12.
-
-To complete the real-data experiment: obtain dataset access and required source permissions, download the exact images, run preprocessing and EDA, train on a Colab GPU, evaluate once on the untouched test set, document actual results, and then explicitly publish permitted code/model artifacts and deploy. Patient metadata, images, secrets, notebooks with outputs, trained weights, and generated reports belong outside Git.
+For education and research only. This project is not validated
+for clinical diagnosis and must not be used for medical decisions.
